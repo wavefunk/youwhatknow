@@ -1,0 +1,8 @@
+/target
+/.direnv/
+/.envrc.private
+.env
+/rustc-ice-*
+.dolt/
+*.db
+/.claude/skills/

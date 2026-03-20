@@ -1,0 +1,23 @@
+[package]
+name = "youwhatknow"
+version = "0.0.1"
+authors = ["wavefunk"]
+description = "Hooks for Claude Code that inject project file info and summaries, track repeat reads, and monitor token usage"
+edition = "2024"
+
+[[bin]]
+name = "youwhatknow"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+tracing = { version = "0.1", features = ["log-always"] }
+eyre = "0.6"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+figment = { version = "0.10", features = ["toml", "env"] }
+
+[profile.dev]
+incremental = true
