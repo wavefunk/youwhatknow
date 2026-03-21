@@ -273,7 +273,9 @@ impl Index {
     async fn index_files(&self, project_root: &Path, config: &ProjectConfig, files: &[PathBuf]) {
         // Extract symbols
         let mut file_symbols: Vec<(PathBuf, Vec<String>)> = Vec::new();
+        tracing::info!(files = files.len(), "extracting symbols");
         for rel_path in files {
+            tracing::trace!(file = %rel_path.display(), "extracting symbols");
             let abs_path = project_root.join(rel_path);
             let source = match std::fs::read(&abs_path) {
                 Ok(s) => s,
@@ -283,8 +285,9 @@ impl Index {
             file_symbols.push((rel_path.clone(), syms));
             self.inner.indexed_count.fetch_add(1, Ordering::Relaxed);
         }
+        tracing::info!(files = file_symbols.len(), "symbol extraction complete");
 
-        // Generate descriptions
+        // Generate file descriptions
         let descriptions = describe::generate_descriptions(
             project_root,
             &file_symbols,
@@ -318,7 +321,6 @@ impl Index {
             let key = storage::folder_to_key(&folder);
             let file_key = discovery::file_key(rel_path);
 
-            // Update in-memory index
             self.inner
                 .files
                 .write()
@@ -331,60 +333,92 @@ impl Index {
                 .push((file_key, summary));
         }
 
-        // Update folder summaries (merge with existing)
-        let summary_dir = project_root.join(&config.summary_path);
-        let mut folders = self.inner.folders.write().await;
-
-        for (key, new_files) in &folder_files {
-            let folder = folders.entry(key.clone()).or_insert_with(|| {
-                let folder_path = storage::key_to_folder(key);
-                FolderSummary {
-                    generated: now,
-                    description: folder_path,
-                    files: HashMap::new(),
+        // Phase 1: merge file data into folders (write lock, then drop)
+        {
+            let mut folders = self.inner.folders.write().await;
+            for (key, new_files) in &folder_files {
+                let folder = folders.entry(key.clone()).or_insert_with(|| {
+                    let folder_path = storage::key_to_folder(key);
+                    FolderSummary {
+                        generated: now,
+                        description: folder_path,
+                        files: HashMap::new(),
+                    }
+                });
+                folder.generated = now;
+                for (file_key, summary) in new_files {
+                    folder.files.insert(file_key.clone(), summary.clone());
                 }
-            });
+            }
+        } // write lock dropped here
 
-            folder.generated = now;
-            for (file_key, summary) in new_files {
-                folder.files.insert(file_key.clone(), summary.clone());
+        // Phase 2: collect folder inputs (read lock)
+        let folder_inputs: Vec<(String, Vec<String>)> = {
+            let folders = self.inner.folders.read().await;
+            folders.iter().map(|(key, folder)| {
+                let file_descs: Vec<String> = folder.files.values()
+                    .map(|f| {
+                        let name = f.path.file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or_default();
+                        format!("{name}: {}", f.description)
+                    })
+                    .collect();
+                (storage::key_to_folder(key), file_descs)
+            }).collect()
+        }; // read lock dropped
+
+        // Phase 3: generate folder descriptions (no lock held)
+        let folder_descs = describe::generate_folder_descriptions(
+            project_root,
+            &folder_inputs,
+            config.max_concurrent_batches,
+        ).await;
+
+        // Phase 4: update descriptions + save to disk (write lock)
+        {
+            let mut folders = self.inner.folders.write().await;
+
+            // Apply generated descriptions
+            for (key, folder) in folders.iter_mut() {
+                let folder_path = storage::key_to_folder(key);
+                if let Some(desc) = folder_descs.get(&folder_path) {
+                    folder.description = desc.clone();
+                }
             }
 
-            // Save to disk
-            let path = summary_dir.join(format!("{key}.toml"));
-            if let Err(e) = storage::save_folder_summary(&path, folder) {
-                tracing::warn!("failed to save {}: {e}", path.display());
+            // Save folder summaries to disk
+            let summary_dir = project_root.join(&config.summary_path);
+            for (key, folder) in folders.iter() {
+                let path = summary_dir.join(format!("{key}.toml"));
+                if let Err(e) = storage::save_folder_summary(&path, folder) {
+                    tracing::warn!("failed to save {}: {e}", path.display());
+                }
             }
-        }
 
-        // Update project summary
-        let commit = discovery::current_commit(project_root).unwrap_or_default();
-        let project = ProjectSummary {
-            generated: now,
-            last_commit: commit.clone(),
-            folders: folders
-                .iter()
-                .map(|(key, folder)| {
-                    (
-                        key.clone(),
-                        FolderEntry {
-                            path: format!("{}/", storage::key_to_folder(key)),
-                            description: folder.description.clone(),
-                        },
-                    )
-                })
-                .collect(),
-        };
+            // Build and save project summary
+            let commit = discovery::current_commit(project_root).unwrap_or_default();
+            let project = ProjectSummary {
+                generated: now,
+                last_commit: commit.clone(),
+                folders: folders.iter().map(|(key, folder)| {
+                    (key.clone(), FolderEntry {
+                        path: format!("{}/", storage::key_to_folder(key)),
+                        description: folder.description.clone(),
+                    })
+                }).collect(),
+            };
 
-        *self.inner.project.write().await = Some(project.clone());
+            *self.inner.project.write().await = Some(project.clone());
 
-        let project_path = summary_dir.join("project-summary.toml");
-        if let Err(e) = storage::save_project_summary(&project_path, &project) {
-            tracing::warn!("failed to save project summary: {e}");
-        }
+            let project_path = summary_dir.join("project-summary.toml");
+            if let Err(e) = storage::save_project_summary(&project_path, &project) {
+                tracing::warn!("failed to save project summary: {e}");
+            }
 
-        if let Err(e) = storage::write_last_run(&summary_dir, &commit) {
-            tracing::warn!("failed to write .last-run: {e}");
+            if let Err(e) = storage::write_last_run(&summary_dir, &commit) {
+                tracing::warn!("failed to write .last-run: {e}");
+            }
         }
     }
 }
