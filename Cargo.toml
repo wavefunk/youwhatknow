@@ -2,7 +2,7 @@
 name = "youwhatknow"
 version = "0.0.1"
 authors = ["wavefunk"]
-description = "Hooks for Claude Code that inject project file info and summaries, track repeat reads, and monitor token usage"
+description = "Claude Code hook server that injects file summaries before reads and tracks repeat reads per session"
 edition = "2024"
 
 [[bin]]
@@ -18,6 +18,20 @@ serde_json = "1"
 thiserror = "2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
 figment = { version = "0.10", features = ["toml", "env"] }
+axum = "0.8.8"
+tower-http = { version = "0.6.8", features = ["trace", "timeout"] }
+toml = "1.0.7"
+chrono = { version = "0.4.44", features = ["serde"] }
+glob-match = "0.2.1"
+tempfile = "3.27.0"
+tree-sitter = "0.25"
+tree-sitter-rust = "0.24.1"
+tree-sitter-typescript = "0.23.2"
+tree-sitter-python = "0.25.0"
+tree-sitter-go = "0.25.0"
+streaming-iterator = "0.1.9"
+tower = { version = "0.5.3", features = ["util"] }
+http = "1.4.0"
 
 [profile.dev]
 incremental = true

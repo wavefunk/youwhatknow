@@ -19,5 +19,8 @@ watch:
 run:
     cargo run
 
+serve:
+    cargo run
+
 build:
     cargo build --release
