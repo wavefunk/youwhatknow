@@ -40,16 +40,38 @@
         youwhatknow = pkgs.rustPlatform.buildRustPackage {
           pname = "youwhatknow";
           version = "0.0.1";
-          src = ./.;
+          src = pkgs.lib.cleanSourceWith {
+            src = ./.;
+            filter = path: type:
+              let
+                baseName = builtins.baseNameOf path;
+                relPath = pkgs.lib.removePrefix (toString ./.) (toString path);
+              in
+              # Only include files that affect the Rust build
+              (type == "directory" && (
+                baseName == "src" ||
+                pkgs.lib.hasPrefix "/src" relPath
+              )) ||
+              baseName == "Cargo.toml" ||
+              baseName == "Cargo.lock" ||
+              baseName == "build.rs" ||
+              pkgs.lib.hasSuffix ".rs" baseName;
+          };
           cargoHash = "sha256-ugGZbHuU7ZQ15U+wS5ACzbs7j0ipyKOiTFPl1I1GKUI=";
 
           nativeBuildInputs = with pkgs; [
             pkg-config
+            makeWrapper
           ];
 
           buildInputs = with pkgs; [
             openssl
           ];
+
+          postInstall = ''
+            wrapProgram $out/bin/youwhatknow \
+              --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.claude-code ]}
+          '';
         };
 
         # Shell hook that ensures the system-wide youwhatknow daemon is running.
