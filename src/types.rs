@@ -42,17 +42,20 @@ pub struct ProjectSummary {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct HookRequest {
+    #[serde(alias = "sessionId")]
     pub session_id: String,
     pub cwd: PathBuf,
+    #[serde(alias = "hookEventName")]
     pub hook_event_name: String,
-    #[serde(default)]
+    #[serde(default, alias = "toolName")]
     pub tool_name: Option<String>,
-    #[serde(default)]
+    #[serde(default, alias = "toolInput")]
     pub tool_input: Option<ToolInput>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ToolInput {
+    #[serde(alias = "filePath")]
     pub file_path: PathBuf,
 }
 
@@ -171,6 +174,43 @@ mod tests {
         }"#;
 
         let req: HookRequest = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(req.hook_event_name, "SessionStart");
+        assert!(req.tool_name.is_none());
+        assert!(req.tool_input.is_none());
+    }
+
+    #[test]
+    fn hook_request_deserializes_camel_case() {
+        let json = r#"{
+            "sessionId": "abc123",
+            "cwd": "/home/user/project",
+            "hookEventName": "PreToolUse",
+            "toolName": "Read",
+            "toolInput": {
+                "file_path": "/home/user/project/src/main.rs"
+            }
+        }"#;
+
+        let req: HookRequest = serde_json::from_str(json).expect("deserialize camelCase");
+        assert_eq!(req.session_id, "abc123");
+        assert_eq!(req.hook_event_name, "PreToolUse");
+        assert_eq!(req.tool_name.as_deref(), Some("Read"));
+        assert_eq!(
+            req.tool_input.as_ref().map(|t| &t.file_path),
+            Some(&PathBuf::from("/home/user/project/src/main.rs"))
+        );
+    }
+
+    #[test]
+    fn hook_request_deserializes_camel_case_session_start() {
+        let json = r#"{
+            "sessionId": "sess-456",
+            "cwd": "/home/user/project",
+            "hookEventName": "SessionStart"
+        }"#;
+
+        let req: HookRequest = serde_json::from_str(json).expect("deserialize camelCase");
+        assert_eq!(req.session_id, "sess-456");
         assert_eq!(req.hook_event_name, "SessionStart");
         assert!(req.tool_name.is_none());
         assert!(req.tool_input.is_none());
