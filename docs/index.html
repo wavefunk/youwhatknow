@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>youwhatknow &mdash; stop Claude from reading the same file 47 times</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Mono:wght@400;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0c;
+            --bg-card: #111114;
+            --glow: #39ff85;
+            --glow-dim: #39ff8533;
+            --glow-mid: #39ff8566;
+            --amber: #ffb830;
+            --amber-dim: #ffb83033;
+            --red: #ff4f4f;
+            --red-dim: #ff4f4f22;
+            --text: #c8c8d0;
+            --text-dim: #5a5a6e;
+            --border: #1e1e28;
+            --mono: 'JetBrains Mono', 'Courier New', monospace;
+            --display: 'Space Mono', monospace;
+            --serif: 'Instrument Serif', Georgia, serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 15px;
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            opacity: 0.035;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            background-size: 128px;
+            pointer-events: none;
+            z-index: 9998;
+        }
+
+        a { color: var(--glow); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .container { max-width: 900px; margin: 0 auto; padding: 0 2rem; }
+
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+            padding: 4rem 0;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--glow);
+            border: 1px solid var(--glow-dim);
+            padding: 0.4rem 1rem;
+            border-radius: 2px;
+            margin-bottom: 2.5rem;
+            background: var(--glow-dim);
+            width: fit-content;
+            animation: fadeSlideUp 0.8s ease both;
+        }
+
+        .hero-badge-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--glow);
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .hero h1 {
+            font-family: var(--serif);
+            font-size: clamp(3.5rem, 8vw, 6.5rem);
+            font-weight: 400;
+            font-style: italic;
+            line-height: 1;
+            color: #fff;
+            margin-bottom: 0.25em;
+            animation: fadeSlideUp 0.8s ease 0.1s both;
+        }
+
+        .hero h1 em {
+            font-style: normal;
+            color: var(--glow);
+            text-shadow: 0 0 40px var(--glow-dim), 0 0 80px var(--glow-dim);
+        }
+
+        .hero-sub {
+            font-size: 1.15rem;
+            color: var(--text-dim);
+            max-width: 520px;
+            line-height: 1.8;
+            margin-bottom: 3rem;
+            animation: fadeSlideUp 0.8s ease 0.2s both;
+        }
+
+        .hero-sub strong { color: var(--text); font-weight: 500; }
+
+        .hero-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: var(--glow);
+            color: var(--bg);
+            font-family: var(--mono);
+            font-size: 13px;
+            font-weight: 700;
+            padding: 0.85rem 2rem;
+            border: none;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            transition: all 0.2s;
+            animation: fadeSlideUp 0.8s ease 0.3s both;
+            text-decoration: none;
+        }
+
+        .hero-cta:hover {
+            background: #fff;
+            text-decoration: none;
+            box-shadow: 0 0 30px var(--glow-dim);
+        }
+
+        .terminal-float {
+            position: absolute;
+            right: -60px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 380px;
+            animation: fadeSlideLeft 1s ease 0.5s both;
+        }
+
+        .terminal {
+            background: #0d0d12;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            font-size: 11.5px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 1px var(--border);
+        }
+
+        .terminal-bar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 14px;
+            background: #161620;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .terminal-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .terminal-dot.r { background: #ff5f57; }
+        .terminal-dot.y { background: #febc2e; }
+        .terminal-dot.g { background: #28c840; }
+
+        .terminal-bar-title {
+            margin-left: auto;
+            font-size: 10px;
+            color: var(--text-dim);
+            letter-spacing: 0.05em;
+        }
+
+        .terminal-body {
+            padding: 14px;
+            min-height: 260px;
+            position: relative;
+        }
+
+        .term-line {
+            margin-bottom: 2px;
+            opacity: 0;
+            animation: termFadeIn 0.15s ease forwards;
+            white-space: nowrap;
+            font-size: 11.5px;
+        }
+
+        .t-prompt { color: var(--glow); }
+        .t-cmd { color: var(--text); }
+        .t-file { color: var(--amber); }
+        .t-warn { color: var(--red); }
+        .t-ok { color: var(--glow); }
+        .t-dim { color: var(--text-dim); }
+        .t-bold { font-weight: 700; }
+
+        .cursor-blink {
+            display: inline-block;
+            width: 7px;
+            height: 14px;
+            background: var(--glow);
+            animation: blink 1s step-end infinite;
+            vertical-align: middle;
+            margin-left: 2px;
+        }
+
+        section { padding: 6rem 0; }
+
+        .section-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: var(--glow);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .section-label::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        h2 {
+            font-family: var(--serif);
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 400;
+            font-style: italic;
+            color: #fff;
+            margin-bottom: 1.5rem;
+            line-height: 1.2;
+        }
+
+        .muted { color: var(--text-dim); max-width: 600px; }
+
+        .problem-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-top: 3rem;
+        }
+
+        .problem-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+            border-top: 2px solid var(--red);
+        }
+
+        .problem-card h3 {
+            font-family: var(--display);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--red);
+            margin-bottom: 0.75rem;
+        }
+
+        .problem-card p { font-size: 13px; color: var(--text-dim); line-height: 1.7; }
+
+        .problem-stat {
+            font-family: var(--serif);
+            font-size: 3rem;
+            font-style: italic;
+            color: var(--red);
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .flow { display: grid; gap: 0; margin-top: 3rem; }
+
+        .flow-step {
+            display: grid;
+            grid-template-columns: 60px 1fr;
+            gap: 2rem;
+            padding: 2rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .flow-step:last-child { border-bottom: none; }
+
+        .flow-num {
+            font-family: var(--serif);
+            font-size: 2.5rem;
+            font-style: italic;
+            color: var(--glow);
+            line-height: 1;
+            text-shadow: 0 0 20px var(--glow-dim);
+        }
+
+        .flow-step h3 {
+            font-family: var(--display);
+            font-size: 14px;
+            color: #fff;
+            margin-bottom: 0.5rem;
+            letter-spacing: 0.02em;
+        }
+
+        .flow-step p { font-size: 13px; color: var(--text-dim); line-height: 1.7; }
+
+        .flow-step code {
+            display: inline-block;
+            background: var(--glow-dim);
+            color: var(--glow);
+            padding: 0.15em 0.5em;
+            font-size: 11px;
+            margin-top: 0.75rem;
+            border: 1px solid var(--glow-dim);
+        }
+
+        .arch-diagram {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 3rem 2rem;
+            margin-top: 3rem;
+            border-top: 2px solid var(--glow);
+        }
+
+        .arch-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .arch-row:last-child { margin-bottom: 0; }
+
+        .arch-box {
+            padding: 0.75rem 1.5rem;
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            text-align: center;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            min-width: 160px;
+        }
+
+        .arch-box.primary {
+            border-color: var(--glow-mid);
+            color: var(--glow);
+            box-shadow: 0 0 20px var(--glow-dim);
+        }
+
+        .arch-box.secondary { border-color: var(--amber-dim); color: var(--amber); }
+
+        .arch-arrow-down {
+            display: block;
+            text-align: center;
+            margin: 0.75rem 0;
+            color: var(--text-dim);
+            font-size: 13px;
+            letter-spacing: 0.05em;
+        }
+
+        .benefits-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            background: var(--border);
+            margin-top: 3rem;
+            border: 1px solid var(--border);
+        }
+
+        .benefit { background: var(--bg-card); padding: 2.5rem 2rem; }
+        .benefit-icon { font-size: 1.5rem; margin-bottom: 1rem; display: block; }
+
+        .benefit h3 {
+            font-family: var(--display);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #fff;
+            margin-bottom: 0.75rem;
+        }
+
+        .benefit p { font-size: 12.5px; color: var(--text-dim); line-height: 1.7; }
+
+        .setup-block {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            margin-top: 2rem;
+            overflow: hidden;
+        }
+
+        .setup-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1.25rem;
+            background: #161620;
+            border-bottom: 1px solid var(--border);
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .setup-tag {
+            color: var(--glow);
+            background: var(--glow-dim);
+            padding: 0.2em 0.6em;
+            font-size: 10px;
+            letter-spacing: 0.05em;
+        }
+
+        .setup-code {
+            padding: 1.5rem;
+            font-size: 12.5px;
+            line-height: 1.8;
+            overflow-x: auto;
+            white-space: pre;
+            font-family: var(--mono);
+        }
+
+        .k { color: var(--amber); }
+        .s { color: var(--glow); }
+        .c { color: var(--text-dim); font-style: italic; }
+
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 3rem 0;
+            margin-top: 4rem;
+            text-align: center;
+        }
+
+        footer p { font-size: 12px; color: var(--text-dim); }
+
+        .footer-logo {
+            font-family: var(--serif);
+            font-style: italic;
+            font-size: 1.5rem;
+            color: #fff;
+            margin-bottom: 0.5rem;
+        }
+
+        @keyframes fadeSlideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeSlideLeft {
+            from { opacity: 0; transform: translate(30px, -50%); }
+            to { opacity: 1; transform: translate(0, -50%); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        @keyframes termFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        @media (max-width: 900px) {
+            .terminal-float {
+                position: relative;
+                right: 0;
+                top: 0;
+                transform: none;
+                width: 100%;
+                margin-top: 3rem;
+                animation-name: fadeSlideUp;
+            }
+            .problem-grid { grid-template-columns: 1fr; }
+            .benefits-grid { grid-template-columns: 1fr; }
+            .arch-row { flex-direction: column; }
+        }
+
+        @media (min-width: 901px) {
+            .hero .container { position: relative; }
+        }
+    </style>
+</head>
+<body>
+
+<section class="hero">
+    <div class="container">
+        <div class="hero-badge"><span class="hero-badge-dot"></span> Claude Code Hook Server</div>
+        <h1><em>you what know</em></h1>
+        <p class="hero-sub">
+            Claude reads <strong>src/main.rs</strong> for the 5th time this session.
+            You stare at the screen. <strong>"You what now?"</strong><br>
+            This tool intercepts those reads and says: <em>here's what's in the file. Do you really need it again?</em>
+        </p>
+        <a href="#setup" class="hero-cta">Get Started &#8594;</a>
+
+        <div class="terminal-float">
+            <div class="terminal">
+                <div class="terminal-bar">
+                    <div class="terminal-dot r"></div>
+                    <div class="terminal-dot y"></div>
+                    <div class="terminal-dot g"></div>
+                    <span class="terminal-bar-title">claude session</span>
+                </div>
+                <div class="terminal-body" id="terminal-demo"></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="reveal">
+    <div class="container">
+        <div class="section-label">The Problem</div>
+        <h2>Claude has a reading problem.</h2>
+        <p class="muted">
+            Every exploration task starts with an avalanche of file reads. Large files get pulled in whole.
+            The same file gets read 3, 4, 5 times in a single session. Each read eats context tokens
+            that could be used for actual thinking.
+        </p>
+
+        <div class="problem-grid">
+            <div class="problem-card">
+                <span class="problem-stat" id="counter">0</span>
+                <h3>Wasted Reads</h3>
+                <p>Average redundant file reads in a complex coding session. Each one consumes tokens for content Claude already saw.</p>
+            </div>
+            <div class="problem-card">
+                <span class="problem-stat">40%</span>
+                <h3>Context Bloat</h3>
+                <p>Estimated context window consumed by re-reading files that were already loaded earlier in the session.</p>
+            </div>
+            <div class="problem-card">
+                <span class="problem-stat">100KB</span>
+                <h3>Blind Reads</h3>
+                <p>Claude reads entire files without knowing what's inside. A 2000-line file gets loaded just to check one function signature.</p>
+            </div>
+            <div class="problem-card">
+                <span class="problem-stat">&#8734;</span>
+                <h3>No Memory</h3>
+                <p>Each read has zero awareness of prior reads. No built-in "hey, you already read this" mechanism exists.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="reveal">
+    <div class="container">
+        <div class="section-label">How It Works</div>
+        <h2>A quiet interceptor.</h2>
+        <p class="muted">
+            youwhatknow runs as a system-wide daemon and hooks into Claude Code's tool lifecycle.
+            Before every file read, it injects a compact summary. Claude can then decide
+            if it actually needs the full file.
+        </p>
+
+        <div class="flow">
+            <div class="flow-step">
+                <div class="flow-num">1</div>
+                <div>
+                    <h3>Claude triggers a Read</h3>
+                    <p>Claude Code fires a <strong>PreToolUse</strong> hook before executing the Read tool.
+                    The hook sends the file path and session ID to youwhatknow via HTTP.</p>
+                    <code>POST /hook/pre-read</code>
+                </div>
+            </div>
+            <div class="flow-step">
+                <div class="flow-num">2</div>
+                <div>
+                    <h3>Summary injected</h3>
+                    <p>youwhatknow looks up the file in its index and returns a 3-line summary:
+                    description, public symbols, and folder context. This gets injected into
+                    Claude's context <em>before</em> the read happens.</p>
+                    <code>additionalContext: "Public: Config, load(), default()"</code>
+                </div>
+            </div>
+            <div class="flow-step">
+                <div class="flow-num">3</div>
+                <div>
+                    <h3>Re-read warning</h3>
+                    <p>If Claude already read this file in the current session, youwhatknow
+                    flags it: <em>"This file was already read 3x. Do you still need the full file?"</em></p>
+                    <code>read 3x this session</code>
+                </div>
+            </div>
+            <div class="flow-step">
+                <div class="flow-num">4</div>
+                <div>
+                    <h3>Project map on startup</h3>
+                    <p>On <strong>SessionStart</strong>, the full project structure is injected
+                    so Claude knows where everything is without exploring.</p>
+                    <code>POST /hook/session-start</code>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="reveal">
+    <div class="container">
+        <div class="section-label">Architecture</div>
+        <h2>One daemon, all projects.</h2>
+        <p class="muted" style="margin-bottom: 1rem;">
+            A single system-wide process serves every Claude Code instance across all your projects.
+            Indexes are loaded lazily per-project on first request.
+        </p>
+
+        <div class="arch-diagram">
+            <div class="arch-row">
+                <div class="arch-box secondary">Claude Session A</div>
+                <div class="arch-box secondary">Claude Session B</div>
+                <div class="arch-box secondary">Subagent</div>
+            </div>
+            <div class="arch-arrow-down">&#8595; HTTP hooks &#8595;</div>
+            <div class="arch-row">
+                <div class="arch-box primary">youwhatknow daemon &#8212; localhost:7849</div>
+            </div>
+            <div class="arch-arrow-down">&#8595; per-project routing via cwd &#8595;</div>
+            <div class="arch-row">
+                <div class="arch-box">Project A Index</div>
+                <div class="arch-box">Project B Index</div>
+                <div class="arch-box">Project C Index</div>
+            </div>
+            <div class="arch-arrow-down">&#8595;</div>
+            <div class="arch-row">
+                <div class="arch-box" style="min-width: 260px;">tree-sitter symbols &#8226; haiku descriptions &#8226; TOML storage</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="reveal">
+    <div class="container">
+        <div class="section-label">Benefits</div>
+        <h2>What you actually get.</h2>
+
+        <div class="benefits-grid">
+            <div class="benefit">
+                <span class="benefit-icon" style="color: var(--glow);">&lt;/&gt;</span>
+                <h3>Smaller Context</h3>
+                <p>Summaries are 3 lines instead of 2000. Claude gets what it needs without filling the window.</p>
+            </div>
+            <div class="benefit">
+                <span class="benefit-icon" style="color: var(--amber);">&#8634;</span>
+                <h3>Re-read Awareness</h3>
+                <p>Per-session tracking warns Claude when it's reading a file again. Breaks the compulsive loop.</p>
+            </div>
+            <div class="benefit">
+                <span class="benefit-icon" style="color: var(--red);">&#8709;</span>
+                <h3>Zero Config</h3>
+                <p>One HTTP hook in settings.json. The daemon handles everything: indexing, session tracking, multi-project routing.</p>
+            </div>
+            <div class="benefit">
+                <span class="benefit-icon" style="color: var(--glow);">&#9638;</span>
+                <h3>Multi-Project</h3>
+                <p>Single daemon serves all projects. Indexes loaded lazily on first request. No per-project setup.</p>
+            </div>
+            <div class="benefit">
+                <span class="benefit-icon" style="color: var(--amber);">&#8635;</span>
+                <h3>Incremental Index</h3>
+                <p>Only re-indexes files that changed since last run. Uses git diff for fast change detection.</p>
+            </div>
+            <div class="benefit">
+                <span class="benefit-icon" style="color: var(--red);">&#10005;</span>
+                <h3>Non-Blocking</h3>
+                <p>If the daemon isn't running, Claude works normally. HTTP hooks fail silently. No disruption, ever.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="reveal" id="setup">
+    <div class="container">
+        <div class="section-label">Get Started</div>
+        <h2>Two steps. Done.</h2>
+
+        <div class="setup-block">
+            <div class="setup-header">
+                <span>~/.claude/settings.json</span>
+                <span class="setup-tag">step 1: hook config</span>
+            </div>
+            <div class="setup-code">{
+  <span class="k">"hooks"</span>: {
+    <span class="k">"PreToolUse"</span>: [{
+      <span class="k">"matcher"</span>: <span class="s">"Read"</span>,
+      <span class="k">"hooks"</span>: [{
+        <span class="k">"type"</span>: <span class="s">"http"</span>,
+        <span class="k">"url"</span>: <span class="s">"http://localhost:7849/hook/pre-read"</span>
+      }]
+    }],
+    <span class="k">"SessionStart"</span>: [{
+      <span class="k">"matcher"</span>: <span class="s">"startup"</span>,
+      <span class="k">"hooks"</span>: [{
+        <span class="k">"type"</span>: <span class="s">"http"</span>,
+        <span class="k">"url"</span>: <span class="s">"http://localhost:7849/hook/session-start"</span>
+      }]
+    }]
+  }
+}</div>
+        </div>
+
+        <div class="setup-block" style="margin-top: 1.5rem;">
+            <div class="setup-header">
+                <span>terminal</span>
+                <span class="setup-tag">step 2: start the daemon</span>
+            </div>
+            <div class="setup-code"><span class="c"># Install and run (or add to your shell profile / nix flake)</span>
+<span class="s">$</span> youwhatknow
+
+<span class="c"># That's it. Indexes projects lazily on first hook request.</span>
+<span class="c"># Auto-shuts down after 30 min idle. Restarts on next Claude session.</span></div>
+        </div>
+
+        <div class="setup-block" style="margin-top: 1.5rem;">
+            <div class="setup-header">
+                <span>~/.config/youwhatknow/config.toml</span>
+                <span class="setup-tag">optional</span>
+            </div>
+            <div class="setup-code"><span class="c"># All settings have sensible defaults</span>
+<span class="k">port</span> = <span class="s">7849</span>
+<span class="k">session_timeout_minutes</span> = <span class="s">60</span>
+<span class="k">idle_shutdown_minutes</span> = <span class="s">30</span></div>
+        </div>
+    </div>
+</section>
+
+<footer>
+    <div class="container">
+        <div class="footer-logo">youwhatknow</div>
+        <p>Built with Rust, Tokio, Axum, and tree-sitter. Because Claude deserves better reading habits.</p>
+    </div>
+</footer>
+
+<script>
+(function() {
+    var lines = [
+        { type: 'cmd', prompt: 'claude', cmd: 'Read', file: 'src/main.rs' },
+        { type: 'msg', text: '  Reading 847 lines...', cls: 't-dim' },
+        { type: 'cmd', prompt: 'claude', cmd: 'Read', file: 'src/config.rs' },
+        { type: 'msg', text: '  Reading 412 lines...', cls: 't-dim' },
+        { type: 'cmd', prompt: 'claude', cmd: 'Read', file: 'src/main.rs' },
+        { type: 'msg', text: '  Reading 847 lines... (again)', cls: 't-warn' },
+        { type: 'cmd', prompt: 'claude', cmd: 'Read', file: 'src/server.rs' },
+        { type: 'msg', text: '  Reading 623 lines...', cls: 't-dim' },
+        { type: 'cmd', prompt: 'claude', cmd: 'Read', file: 'src/main.rs' },
+        { type: 'msg', text: '  Reading 847 lines... (3rd time)', cls: 't-warn' },
+        { type: 'msg', text: '', cls: 't-dim' },
+        { type: 'msg', text: '  youwhatknow:', cls: 't-ok t-bold' },
+        { type: 'msg', text: '  -- src/main.rs (read 3x) --', cls: 't-ok' },
+        { type: 'msg', text: '  Entry point, server startup', cls: 't-ok' },
+        { type: 'msg', text: '  Public: main()', cls: 't-ok' },
+        { type: 'msg', text: '  Do you still need the full file?', cls: 't-warn' },
+    ];
+
+    var terminal = document.getElementById('terminal-demo');
+    var lineIndex = 0;
+
+    function addLine() {
+        if (lineIndex >= lines.length) {
+            var cursor = document.createElement('span');
+            cursor.className = 'cursor-blink';
+            if (terminal.lastElementChild) {
+                terminal.lastElementChild.appendChild(cursor);
+            }
+            return;
+        }
+
+        var line = lines[lineIndex];
+        var el = document.createElement('div');
+        el.className = 'term-line';
+
+        if (line.type === 'cmd') {
+            var prompt = document.createElement('span');
+            prompt.className = 't-prompt';
+            prompt.textContent = line.prompt;
+            var space1 = document.createTextNode(' ');
+            var cmd = document.createElement('span');
+            cmd.className = 't-cmd';
+            cmd.textContent = line.cmd;
+            var space2 = document.createTextNode(' ');
+            var file = document.createElement('span');
+            file.className = 't-file';
+            file.textContent = line.file;
+            el.appendChild(prompt);
+            el.appendChild(space1);
+            el.appendChild(cmd);
+            el.appendChild(space2);
+            el.appendChild(file);
+        } else {
+            var span = document.createElement('span');
+            span.className = line.cls;
+            span.textContent = line.text;
+            el.appendChild(span);
+        }
+
+        terminal.appendChild(el);
+        lineIndex++;
+
+        var delay = line.text === '' ? 400 : (lineIndex > 10 ? 120 : 250);
+        setTimeout(addLine, delay);
+    }
+
+    setTimeout(addLine, 1500);
+
+    function animateCounter() {
+        var counter = document.getElementById('counter');
+        var target = 23;
+        var current = 0;
+        var interval = setInterval(function() {
+            current++;
+            counter.textContent = current;
+            if (current >= target) clearInterval(interval);
+        }, 60);
+    }
+
+    var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('visible');
+                if (entry.target.querySelector('#counter')) {
+                    animateCounter();
+                }
+            }
+        });
+    }, { threshold: 0.15 });
+
+    document.querySelectorAll('.reveal').forEach(function(el) {
+        observer.observe(el);
+    });
+})();
+</script>
+
+</body>
+</html>
