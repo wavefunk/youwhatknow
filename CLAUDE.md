@@ -1,5 +1,5 @@
 # Project Overview : youwhatknow
-Hooks for Claude Code that inject project file info and summaries, track repeat reads, and monitor token usage.
+Claude Code hook server that injects file summaries before reads and tracks repeat reads per session.
 
 ## Tech Stack
 Async runtime = Tokio
@@ -10,8 +10,8 @@ just to run often used commands
 
 ## Context Loading
 Before exploring the codebase (reading files, checking structure, dispatching exploration agents):
-1. Read `.claude/summaries/project-summary.md` — full directory/module map
-2. Read the specific `.claude/summaries/<area>.md` for the area you're working in
+1. Read `.claude/summaries/project-summary.toml` — full directory/module map
+2. Read the specific `.claude/summaries/<area>.toml` for the area you're working in
 3. Only explore files directly if the summaries don't answer your question
 
 ## Work Structure
@@ -40,8 +40,22 @@ youwhatknow/
 ├── .envrc
 ├── .gitignore
 ├── justfile
+├── docs/superpowers/
+│   ├── specs/          — Design specs
+│   └── plans/          — Implementation plans
 └── src/
-    └── main.rs
+    ├── main.rs         — Entry point, server startup, signal handling
+    ├── config.rs       — Figment-based configuration
+    ├── types.rs        — Shared types: summaries, hook request/response
+    ├── storage.rs      — TOML read/write, atomic file operations
+    ├── session.rs      — Per-session read count tracking
+    ├── server.rs       — Axum router, endpoints
+    ├── hooks.rs        — Hook handler logic, response formatting
+    └── indexer/
+        ├── mod.rs      — Index orchestration, full/incremental indexing
+        ├── discovery.rs — File discovery via git, filtering
+        ├── symbols.rs  — Tree-sitter symbol extraction
+        └── describe.rs — Haiku CLI description generation, fallback
 
 ## Available commands
 The just file has available commands. Be mindful of commands that you run often, add it to the justfile.
