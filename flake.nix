@@ -52,32 +52,26 @@
           ];
         };
 
-        # Shell hook script that starts youwhatknow in the background
-        # if claude is on PATH and the server isn't already running.
-        # The server auto-shuts down after idle_shutdown_minutes of inactivity,
-        # handling the direnv unload case. PID file + EXIT trap handle shell exit.
+        # Shell hook that ensures the system-wide youwhatknow daemon is running.
+        # The daemon serves all projects, auto-shuts down after idle timeout.
+        # PID file at ~/.local/share/youwhatknow/youwhatknow.pid
         youwhatknowHook = ''
           if command -v claude &>/dev/null && command -v youwhatknow &>/dev/null; then
-            _ywk_pidfile="$PWD/.claude/summaries/youwhatknow.pid"
+            _ywk_pidfile="$HOME/.local/share/youwhatknow/youwhatknow.pid"
 
-            # Kill stale instance if PID file exists but process is dead
+            _ywk_running=false
             if [ -f "$_ywk_pidfile" ]; then
-              _ywk_old_pid=$(cat "$_ywk_pidfile" 2>/dev/null)
-              if [ -n "$_ywk_old_pid" ] && kill -0 "$_ywk_old_pid" 2>/dev/null; then
-                # Already running, nothing to do
-                return 0 2>/dev/null || true
-              else
-                rm -f "$_ywk_pidfile"
+              _ywk_pid=$(cat "$_ywk_pidfile" 2>/dev/null)
+              if [ -n "$_ywk_pid" ] && kill -0 "$_ywk_pid" 2>/dev/null; then
+                _ywk_running=true
               fi
             fi
 
-            echo "Starting youwhatknow hook server..."
-            youwhatknow &>/dev/null &
-            _ywk_pid=$!
-            disown
-
-            # Clean up on shell exit (handles terminal close)
-            trap "kill $_ywk_pid 2>/dev/null; rm -f '$_ywk_pidfile'" EXIT
+            if [ "$_ywk_running" = false ]; then
+              echo "Starting youwhatknow daemon..."
+              youwhatknow &>/dev/null &
+              disown
+            fi
           fi
         '';
       in

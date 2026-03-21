@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use chrono::Utc;
 use tokio::sync::RwLock;
 
-use crate::config::Config;
+use crate::config::ProjectConfig;
 use crate::storage;
 use crate::types::{FileSummary, FolderEntry, FolderSummary, ProjectSummary};
 
@@ -51,7 +51,7 @@ impl Index {
     }
 
     /// Load existing summaries from disk into memory.
-    pub async fn load_from_disk(&self, project_root: &Path, config: &Config) {
+    pub async fn load_from_disk(&self, project_root: &Path, config: &ProjectConfig) {
         let summary_dir = project_root.join(&config.summary_path);
 
         match storage::load_all_summaries(&summary_dir) {
@@ -169,12 +169,13 @@ impl Index {
         self.inner.indexed_count.load(Ordering::Relaxed)
     }
 
+    #[allow(dead_code)]
     pub fn total_count(&self) -> usize {
         self.inner.total_count.load(Ordering::Relaxed)
     }
 
     /// Run a full index of the project. Call from a background task.
-    pub async fn full_index(&self, project_root: &Path, config: &Config) {
+    pub async fn full_index(&self, project_root: &Path, config: &ProjectConfig) {
         tracing::info!("starting full index");
 
         let files = match discovery::discover_files(project_root, config) {
@@ -198,7 +199,7 @@ impl Index {
     }
 
     /// Run an incremental index for changed files only.
-    pub async fn incremental_index(&self, project_root: &Path, config: &Config) {
+    pub async fn incremental_index(&self, project_root: &Path, config: &ProjectConfig) {
         let summary_dir = project_root.join(&config.summary_path);
         let last_commit = storage::read_last_run(&summary_dir);
 
@@ -267,7 +268,7 @@ impl Index {
     }
 
     /// Index a set of files: extract symbols, generate descriptions, update in-memory + disk.
-    async fn index_files(&self, project_root: &Path, config: &Config, files: &[PathBuf]) {
+    async fn index_files(&self, project_root: &Path, config: &ProjectConfig, files: &[PathBuf]) {
         // Extract symbols
         let mut file_symbols: Vec<(PathBuf, Vec<String>)> = Vec::new();
         for rel_path in files {

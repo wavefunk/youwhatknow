@@ -3,10 +3,10 @@ use std::process::Command;
 
 use eyre::{Context, bail};
 
-use crate::config::Config;
+use crate::config::ProjectConfig;
 
 /// Discover all indexable files in the project using `git ls-files`.
-pub fn discover_files(project_root: &Path, config: &Config) -> eyre::Result<Vec<PathBuf>> {
+pub fn discover_files(project_root: &Path, config: &ProjectConfig) -> eyre::Result<Vec<PathBuf>> {
     let output = Command::new("git")
         .args(["ls-files", "--cached", "--others", "--exclude-standard"])
         .current_dir(project_root)
@@ -250,7 +250,7 @@ mod tests {
     fn test_discover_files_in_real_repo() {
         // Test against this repo
         let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let config = Config::default();
+        let config = ProjectConfig::default();
         let files = discover_files(root, &config).expect("discover");
 
         // Should find src/main.rs at minimum

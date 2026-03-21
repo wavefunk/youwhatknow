@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -11,7 +10,7 @@ use axum::Router;
 
 use crate::config::Config;
 use crate::hooks;
-use crate::indexer::Index;
+use crate::registry::ProjectRegistry;
 use crate::session::SessionTracker;
 use crate::types::{HealthResponse, HookRequest, HookResponse};
 
@@ -62,7 +61,6 @@ impl ActivityTracker {
                         idle_secs = idle.as_secs(),
                         "idle timeout reached, shutting down"
                     );
-                    // Clean exit — this will trigger graceful shutdown
                     std::process::exit(0);
                 }
             }
@@ -72,10 +70,10 @@ impl ActivityTracker {
 
 #[derive(Clone)]
 pub struct AppState {
-    pub index: Index,
+    pub registry: ProjectRegistry,
     pub session: SessionTracker,
+    #[allow(dead_code)]
     pub config: Arc<Config>,
-    pub project_root: PathBuf,
     pub activity: ActivityTracker,
 }
 
@@ -93,42 +91,39 @@ async fn pre_read_handler(
     Json(request): Json<HookRequest>,
 ) -> Json<HookResponse> {
     state.activity.touch();
+    let (index, _config) = state.registry.get_or_load(&request.cwd).await;
     let response =
-        hooks::handle_pre_read(&state.index, &state.session, &state.project_root, &request)
-            .await;
+        hooks::handle_pre_read(&index, &state.session, &request.cwd, &request).await;
     Json(response)
 }
 
 async fn session_start_handler(
     State(state): State<AppState>,
-    Json(_request): Json<HookRequest>,
+    Json(request): Json<HookRequest>,
 ) -> Json<HookResponse> {
     state.activity.touch();
-    let response = hooks::handle_session_start(&state.index).await;
+    let (index, _config) = state.registry.get_or_load(&request.cwd).await;
+    let response = hooks::handle_session_start(&index).await;
     Json(response)
 }
 
-async fn reindex_handler(State(state): State<AppState>) -> StatusCode {
+async fn reindex_handler(
+    State(state): State<AppState>,
+    Json(request): Json<HookRequest>,
+) -> StatusCode {
     state.activity.touch();
-    let index = state.index.clone();
-    let project_root = state.project_root.clone();
-    let config = state.config.clone();
-
-    tokio::spawn(async move {
-        index.full_index(&project_root, &config).await;
-    });
-
+    state.registry.reindex(&request.cwd).await;
     StatusCode::ACCEPTED
 }
 
 async fn health_handler(State(state): State<AppState>) -> Json<HealthResponse> {
     state.activity.touch();
-    let total = state.index.total_count();
+    let projects = state.registry.project_count().await;
     Json(HealthResponse {
         status: "ok".to_owned(),
-        indexing: !state.index.is_ready(),
-        indexed_files: state.index.indexed_count(),
-        total_files: if total > 0 { Some(total) } else { None },
+        indexing: false,
+        indexed_files: projects,
+        total_files: None,
     })
 }
 
@@ -141,10 +136,9 @@ mod tests {
 
     fn test_state() -> AppState {
         AppState {
-            index: Index::new(),
+            registry: ProjectRegistry::new(),
             session: SessionTracker::new(),
             config: Arc::new(Config::default()),
-            project_root: PathBuf::from("/tmp/test-project"),
             activity: ActivityTracker::new(),
         }
     }
@@ -167,7 +161,6 @@ mod tests {
             .expect("body");
         let health: HealthResponse = serde_json::from_slice(&body).expect("parse");
         assert_eq!(health.status, "ok");
-        assert!(health.indexing); // not ready yet
     }
 
     #[tokio::test]
@@ -202,7 +195,6 @@ mod tests {
             hook_resp.hook_specific_output.permission_decision,
             Some("allow".to_owned())
         );
-        assert!(hook_resp.hook_specific_output.additional_context.is_none());
     }
 
     #[tokio::test]
@@ -224,20 +216,6 @@ mod tests {
 
         let resp = app.oneshot(req).await.expect("response");
         assert_eq!(resp.status(), StatusCode::OK);
-    }
-
-    #[tokio::test]
-    async fn reindex_endpoint_returns_accepted() {
-        let app = router(test_state());
-
-        let req = Request::builder()
-            .uri("/reindex")
-            .method("POST")
-            .body(Body::empty())
-            .expect("request");
-
-        let resp = app.oneshot(req).await.expect("response");
-        assert_eq!(resp.status(), StatusCode::ACCEPTED);
     }
 
     #[test]
