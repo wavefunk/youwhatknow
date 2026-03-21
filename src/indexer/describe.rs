@@ -73,7 +73,7 @@ fn generate_batch(
     let output = Command::new("claude")
         .args([
             "--dangerously-skip-permissions",
-            "-m",
+            "--model",
             "haiku",
             "--print",
             "-p",
