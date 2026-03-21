@@ -48,13 +48,12 @@ async fn main() -> eyre::Result<()> {
     let session = session::SessionTracker::new();
     session.spawn_cleanup_task(config.session_timeout_minutes);
 
-    // Create activity tracker and idle watchdog
+    // Create activity tracker
     let activity = server::ActivityTracker::new();
-    if config.idle_shutdown_minutes > 0 {
-        let timeout = Duration::from_secs(config.idle_shutdown_minutes * 60);
-        activity.spawn_idle_watchdog(timeout);
+    let idle_shutdown_minutes = config.idle_shutdown_minutes;
+    if idle_shutdown_minutes > 0 {
         tracing::info!(
-            minutes = config.idle_shutdown_minutes,
+            minutes = idle_shutdown_minutes,
             "idle shutdown enabled"
         );
     }
@@ -64,7 +63,7 @@ async fn main() -> eyre::Result<()> {
         registry,
         session,
         config: Arc::new(config.clone()),
-        activity,
+        activity: activity.clone(),
     };
     let app = server::router(state);
 
@@ -77,7 +76,7 @@ async fn main() -> eyre::Result<()> {
     tracing::info!(%addr, "listening");
 
     axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
+        .with_graceful_shutdown(shutdown_signal(activity, idle_shutdown_minutes))
         .await
         .context("running server")?;
 
@@ -85,11 +84,23 @@ async fn main() -> eyre::Result<()> {
     Ok(())
 }
 
-async fn shutdown_signal() {
-    tokio::signal::ctrl_c()
-        .await
-        .expect("failed to install CTRL+C handler");
-    tracing::info!("received shutdown signal");
+async fn shutdown_signal(activity: server::ActivityTracker, idle_minutes: u64) {
+    if idle_minutes > 0 {
+        let timeout = Duration::from_secs(idle_minutes * 60);
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {
+                tracing::info!("received CTRL+C");
+            }
+            _ = activity.wait_for_idle_timeout(timeout) => {
+                // idle shutdown logged inside wait_for_idle_timeout
+            }
+        }
+    } else {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install CTRL+C handler");
+        tracing::info!("received CTRL+C");
+    }
 }
 
 /// PID file at ~/.local/share/youwhatknow/youwhatknow.pid

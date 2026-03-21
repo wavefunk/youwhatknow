@@ -174,11 +174,11 @@ pub fn file_folder(rel_path: &Path) -> String {
         .to_owned()
 }
 
-/// Get a safe key name for a file (stem without extension).
-/// e.g., "main.rs" -> "main", "lib.rs" -> "lib"
+/// Get a key name for a file (full filename with extension).
+/// e.g., "src/main.rs" -> "main.rs", "src/lib.rs" -> "lib.rs"
 pub fn file_key(rel_path: &Path) -> String {
     rel_path
-        .file_stem()
+        .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or_default()
         .to_owned()
@@ -197,9 +197,9 @@ mod tests {
 
     #[test]
     fn test_file_key() {
-        assert_eq!(file_key(Path::new("src/main.rs")), "main");
-        assert_eq!(file_key(Path::new("lib.rs")), "lib");
-        assert_eq!(file_key(Path::new("src/indexer/mod.rs")), "mod");
+        assert_eq!(file_key(Path::new("src/main.rs")), "main.rs");
+        assert_eq!(file_key(Path::new("lib.rs")), "lib.rs");
+        assert_eq!(file_key(Path::new("src/indexer/mod.rs")), "mod.rs");
     }
 
     #[test]

@@ -34,7 +34,7 @@ impl ProjectRegistry {
     /// Get the index for a project, loading it lazily if not already known.
     /// Returns (Index, ProjectConfig) for the project.
     pub async fn get_or_load(&self, project_root: &Path) -> (Index, ProjectConfig) {
-        // Fast path: already loaded
+        // Fast path: already loaded (read lock)
         {
             let state = self.inner.read().await;
             if let Some(entry) = state.projects.get(project_root) {
@@ -42,7 +42,14 @@ impl ProjectRegistry {
             }
         }
 
-        // Slow path: load and register
+        // Slow path: acquire write lock and double-check before inserting
+        let mut state = self.inner.write().await;
+
+        // Another request may have loaded this project while we waited for the lock
+        if let Some(entry) = state.projects.get(project_root) {
+            return (entry.index.clone(), entry.config.clone());
+        }
+
         let config = ProjectConfig::load(project_root).unwrap_or_default();
         let index = Index::new();
 
@@ -62,16 +69,13 @@ impl ProjectRegistry {
             }
         });
 
-        let entry = ProjectEntry {
-            index: index.clone(),
-            config: config.clone(),
-        };
-
-        self.inner
-            .write()
-            .await
-            .projects
-            .insert(project_root.to_path_buf(), entry);
+        state.projects.insert(
+            project_root.to_path_buf(),
+            ProjectEntry {
+                index: index.clone(),
+                config: config.clone(),
+            },
+        );
 
         tracing::info!(project = %project_root.display(), "registered new project");
         (index, config)

@@ -48,23 +48,21 @@ impl ActivityTracker {
         Duration::from_secs(now.saturating_sub(last))
     }
 
-    /// Spawn a background task that exits the process after `timeout` of inactivity.
-    pub fn spawn_idle_watchdog(&self, timeout: Duration) -> tokio::task::JoinHandle<()> {
-        let tracker = self.clone();
-        tokio::spawn(async move {
-            let check_interval = Duration::from_secs(30);
-            loop {
-                tokio::time::sleep(check_interval).await;
-                let idle = tracker.idle_duration();
-                if idle >= timeout {
-                    tracing::info!(
-                        idle_secs = idle.as_secs(),
-                        "idle timeout reached, shutting down"
-                    );
-                    std::process::exit(0);
-                }
+    /// Spawn a background task that signals shutdown after `timeout` of inactivity.
+    /// Returns a future that resolves when idle timeout is reached.
+    pub async fn wait_for_idle_timeout(&self, timeout: Duration) {
+        let check_interval = Duration::from_secs(30);
+        loop {
+            tokio::time::sleep(check_interval).await;
+            let idle = self.idle_duration();
+            if idle >= timeout {
+                tracing::info!(
+                    idle_secs = idle.as_secs(),
+                    "idle timeout reached, shutting down"
+                );
+                return;
             }
-        })
+        }
     }
 }
 
@@ -121,9 +119,7 @@ async fn health_handler(State(state): State<AppState>) -> Json<HealthResponse> {
     let projects = state.registry.project_count().await;
     Json(HealthResponse {
         status: "ok".to_owned(),
-        indexing: false,
-        indexed_files: projects,
-        total_files: None,
+        projects,
     })
 }
 

@@ -109,9 +109,7 @@ impl HookResponse {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HealthResponse {
     pub status: String,
-    pub indexing: bool,
-    pub indexed_files: usize,
-    pub total_files: Option<usize>,
+    pub projects: usize,
 }
 
 #[cfg(test)]

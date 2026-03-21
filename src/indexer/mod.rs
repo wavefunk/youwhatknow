@@ -177,6 +177,7 @@ impl Index {
     /// Run a full index of the project. Call from a background task.
     pub async fn full_index(&self, project_root: &Path, config: &ProjectConfig) {
         tracing::info!("starting full index");
+        self.inner.indexed_count.store(0, Ordering::Relaxed);
 
         let files = match discovery::discover_files(project_root, config) {
             Ok(f) => f,
@@ -200,6 +201,7 @@ impl Index {
 
     /// Run an incremental index for changed files only.
     pub async fn incremental_index(&self, project_root: &Path, config: &ProjectConfig) {
+        self.inner.indexed_count.store(0, Ordering::Relaxed);
         let summary_dir = project_root.join(&config.summary_path);
         let last_commit = storage::read_last_run(&summary_dir);
 
