@@ -70,17 +70,26 @@ fn generate_batch(
         prompt.push_str("---\n");
     }
 
-    let output = Command::new("claude")
+    let mut child = Command::new("claude")
         .args([
             "--dangerously-skip-permissions",
             "--model",
             "haiku",
             "--print",
-            "-p",
-            &prompt,
         ])
         .current_dir(project_root)
-        .output()?;
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        use std::io::Write;
+        stdin.write_all(prompt.as_bytes())?;
+        // stdin is dropped here, closing the pipe
+    }
+
+    let output = child.wait_with_output()?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
