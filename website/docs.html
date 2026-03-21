@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>youwhatknow &mdash; docs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Mono:wght@400;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0c;
+            --bg-card: #111114;
+            --glow: #39ff85;
+            --glow-dim: #39ff8533;
+            --glow-mid: #39ff8566;
+            --amber: #ffb830;
+            --amber-dim: #ffb83033;
+            --red: #ff4f4f;
+            --text: #c8c8d0;
+            --text-dim: #5a5a6e;
+            --border: #1e1e28;
+            --mono: 'JetBrains Mono', 'Courier New', monospace;
+            --display: 'Space Mono', monospace;
+            --serif: 'Instrument Serif', Georgia, serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 15px;
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        a { color: var(--glow); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .container { max-width: 800px; margin: 0 auto; padding: 0 2rem; }
+
+        /* ── Nav ── */
+        nav {
+            padding: 1.5rem 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 4rem;
+        }
+
+        nav .container {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .nav-logo {
+            font-family: var(--serif);
+            font-style: italic;
+            font-size: 1.25rem;
+            color: #fff;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 1.5rem;
+            margin-left: auto;
+            font-size: 12px;
+        }
+
+        /* ── Page header ── */
+        .page-header {
+            margin-bottom: 4rem;
+        }
+
+        .page-header h1 {
+            font-family: var(--serif);
+            font-size: clamp(2.5rem, 5vw, 3.5rem);
+            font-weight: 400;
+            font-style: italic;
+            color: #fff;
+            line-height: 1.2;
+            margin-bottom: 1rem;
+        }
+
+        .page-header p {
+            color: var(--text-dim);
+            max-width: 550px;
+            font-size: 14px;
+        }
+
+        /* ── TOC ── */
+        .toc {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 1.5rem 2rem;
+            margin-bottom: 4rem;
+            border-left: 3px solid var(--glow);
+        }
+
+        .toc-title {
+            font-family: var(--display);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--glow);
+            margin-bottom: 0.75rem;
+        }
+
+        .toc ul {
+            list-style: none;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.4rem 2rem;
+        }
+
+        .toc li { font-size: 13px; }
+        .toc li::before { content: ''; }
+
+        /* ── Sections ── */
+        .doc-section {
+            margin-bottom: 4rem;
+            scroll-margin-top: 2rem;
+        }
+
+        .section-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: var(--glow);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .section-label::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        h2 {
+            font-family: var(--serif);
+            font-size: clamp(1.5rem, 3vw, 2rem);
+            font-weight: 400;
+            font-style: italic;
+            color: #fff;
+            margin-bottom: 1rem;
+            line-height: 1.3;
+        }
+
+        h3 {
+            font-family: var(--display);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #fff;
+            margin: 2rem 0 0.75rem;
+        }
+
+        .doc-section p {
+            color: var(--text-dim);
+            font-size: 13.5px;
+            line-height: 1.8;
+            margin-bottom: 1rem;
+            max-width: 650px;
+        }
+
+        .doc-section p strong { color: var(--text); font-weight: 500; }
+
+        /* ── Code blocks ── */
+        .code-block {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            margin: 1rem 0 1.5rem;
+        }
+
+        .code-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.6rem 1.25rem;
+            background: #161620;
+            border-bottom: 1px solid var(--border);
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .code-tag {
+            color: var(--glow);
+            background: var(--glow-dim);
+            padding: 0.15em 0.5em;
+            font-size: 10px;
+        }
+
+        .code-body {
+            padding: 1.25rem;
+            font-size: 12.5px;
+            line-height: 1.8;
+            overflow-x: auto;
+            white-space: pre;
+            font-family: var(--mono);
+        }
+
+        .k { color: var(--amber); }
+        .s { color: var(--glow); }
+        .c { color: var(--text-dim); font-style: italic; }
+        .v { color: var(--text); }
+
+        /* ── Config table ── */
+        .config-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            margin: 1rem 0 1.5rem;
+        }
+
+        .config-table th {
+            text-align: left;
+            font-family: var(--display);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-dim);
+            padding: 0.75rem 1rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .config-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+
+        .config-table tr:last-child td { border-bottom: none; }
+
+        .config-key {
+            font-weight: 500;
+            color: var(--amber);
+            white-space: nowrap;
+        }
+
+        .config-default {
+            color: var(--glow);
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .config-desc {
+            color: var(--text-dim);
+            font-size: 12.5px;
+            line-height: 1.6;
+        }
+
+        /* ── Endpoint cards ── */
+        .endpoint {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            margin: 1rem 0;
+        }
+
+        .endpoint-method {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 0.2em 0.6em;
+            margin-right: 0.75rem;
+            border: 1px solid;
+        }
+
+        .endpoint-method.get {
+            color: var(--glow);
+            border-color: var(--glow-dim);
+            background: var(--glow-dim);
+        }
+
+        .endpoint-method.post {
+            color: var(--amber);
+            border-color: var(--amber-dim);
+            background: var(--amber-dim);
+        }
+
+        .endpoint-path {
+            font-size: 14px;
+            color: #fff;
+            font-weight: 500;
+        }
+
+        .endpoint p {
+            margin-top: 0.75rem;
+            font-size: 12.5px;
+            color: var(--text-dim);
+            line-height: 1.7;
+        }
+
+        /* ── Callout ── */
+        .callout {
+            background: #0d1a10;
+            border: 1px solid #1a3d1f;
+            border-left: 3px solid var(--glow);
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            font-size: 13px;
+            color: var(--glow);
+            line-height: 1.7;
+        }
+
+        .callout-warn {
+            background: #1a1510;
+            border-color: #3d2e1f;
+            border-left-color: var(--amber);
+            color: var(--amber);
+        }
+
+        /* ── File tree ── */
+        .file-tree {
+            font-size: 13px;
+            line-height: 2;
+            padding: 1rem 0;
+        }
+
+        .file-tree .dir { color: var(--amber); }
+        .file-tree .file { color: var(--text-dim); }
+        .file-tree .desc { color: var(--text-dim); font-size: 11px; }
+
+        /* ── Lang table ── */
+        .lang-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            margin: 1rem 0 1.5rem;
+        }
+
+        .lang-card {
+            background: var(--bg-card);
+            padding: 1rem 1.25rem;
+        }
+
+        .lang-card h4 {
+            font-family: var(--display);
+            font-size: 12px;
+            color: #fff;
+            margin-bottom: 0.25rem;
+        }
+
+        .lang-card .exts {
+            font-size: 11px;
+            color: var(--amber);
+            margin-bottom: 0.5rem;
+        }
+
+        .lang-card p {
+            font-size: 11px;
+            color: var(--text-dim);
+            line-height: 1.5;
+        }
+
+        /* ── Footer ── */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 3rem 0;
+            margin-top: 4rem;
+            text-align: center;
+        }
+
+        footer p { font-size: 12px; color: var(--text-dim); }
+
+        .footer-logo {
+            font-family: var(--serif);
+            font-style: italic;
+            font-size: 1.25rem;
+            color: #fff;
+            margin-bottom: 0.5rem;
+        }
+
+        @media (max-width: 600px) {
+            .toc ul { grid-template-columns: 1fr; }
+            .lang-grid { grid-template-columns: 1fr; }
+            .config-table { font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="container">
+        <a href="index.html" class="nav-logo">youwhat(k)now</a>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="docs.html" style="color: #fff;">Docs</a>
+            <a href="https://github.com/wavefunk/youwhatknow">GitHub</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+
+    <div class="page-header">
+        <h1>Documentation</h1>
+        <p>Everything you need to configure, run, and understand youwhatknow. Most of it is optional &#8212; the defaults are designed to just work.</p>
+    </div>
+
+    <div class="toc">
+        <div class="toc-title">On this page</div>
+        <ul>
+            <li><a href="#quickstart">Quickstart</a></li>
+            <li><a href="#daemon-config">Daemon Configuration</a></li>
+            <li><a href="#project-config">Project Configuration</a></li>
+            <li><a href="#hooks">Claude Code Hooks</a></li>
+            <li><a href="#endpoints">API Endpoints</a></li>
+            <li><a href="#indexing">Indexing &amp; Symbols</a></li>
+            <li><a href="#storage">Storage Format</a></li>
+            <li><a href="#env-vars">Environment Variables</a></li>
+            <li><a href="#lifecycle">Lifecycle &amp; PID</a></li>
+            <li><a href="#nix">Nix Integration</a></li>
+        </ul>
+    </div>
+
+    <!-- ═══ QUICKSTART ═══ -->
+    <div class="doc-section" id="quickstart">
+        <div class="section-label">Getting started</div>
+        <h2>Quickstart</h2>
+        <p>Two things to do. One config file to paste, one command to run. That's genuinely it.</p>
+
+        <h3>1. Tell Claude Code about youwhatknow</h3>
+        <p>Add the hook config to your <strong>user-level</strong> Claude Code settings. This applies to all projects, all sessions, all subagents.</p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span>~/.claude/settings.json</span>
+            </div>
+            <div class="code-body">{
+  <span class="k">"hooks"</span>: {
+    <span class="k">"PreToolUse"</span>: [{
+      <span class="k">"matcher"</span>: <span class="s">"Read"</span>,
+      <span class="k">"hooks"</span>: [{
+        <span class="k">"type"</span>: <span class="s">"http"</span>,
+        <span class="k">"url"</span>: <span class="s">"http://localhost:7849/hook/pre-read"</span>
+      }]
+    }],
+    <span class="k">"SessionStart"</span>: [{
+      <span class="k">"matcher"</span>: <span class="s">"startup"</span>,
+      <span class="k">"hooks"</span>: [{
+        <span class="k">"type"</span>: <span class="s">"http"</span>,
+        <span class="k">"url"</span>: <span class="s">"http://localhost:7849/hook/session-start"</span>
+      }]
+    }]
+  }
+}</div>
+        </div>
+
+        <h3>2. Start the daemon</h3>
+        <div class="code-block">
+            <div class="code-header"><span>terminal</span></div>
+            <div class="code-body"><span class="s">$</span> youwhatknow</div>
+        </div>
+
+        <p>That's it. The daemon runs on <strong>localhost:7849</strong>, indexes your projects lazily when Claude first touches them, and shuts itself down after 30 minutes of inactivity.</p>
+
+        <div class="callout">
+            If the daemon isn't running, Claude Code works completely normally. HTTP hooks fail silently &#8212; no errors, no disruption. youwhatknow is strictly additive.
+        </div>
+    </div>
+
+    <!-- ═══ DAEMON CONFIG ═══ -->
+    <div class="doc-section" id="daemon-config">
+        <div class="section-label">Configuration</div>
+        <h2>Daemon Configuration</h2>
+        <p>System-wide settings that apply to the daemon itself. These live in your user config directory and affect all projects.</p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span>~/.config/youwhatknow/config.toml</span>
+                <span class="code-tag">optional</span>
+            </div>
+            <div class="code-body"><span class="c"># All fields are optional. These are the defaults.</span>
+<span class="k">port</span> = <span class="s">7849</span>
+<span class="k">session_timeout_minutes</span> = <span class="s">60</span>
+<span class="k">idle_shutdown_minutes</span> = <span class="s">30</span></div>
+        </div>
+
+        <table class="config-table">
+            <thead>
+                <tr>
+                    <th>Key</th>
+                    <th>Default</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="config-key">port</td>
+                    <td class="config-default">7849</td>
+                    <td class="config-desc">TCP port the daemon listens on. Must match the URL in your Claude Code hooks config.</td>
+                </tr>
+                <tr>
+                    <td class="config-key">session_timeout_minutes</td>
+                    <td class="config-default">60</td>
+                    <td class="config-desc">Minutes of inactivity before a Claude session's read tracking data is cleaned up. Keeps memory tidy during long-running daemon sessions.</td>
+                </tr>
+                <tr>
+                    <td class="config-key">idle_shutdown_minutes</td>
+                    <td class="config-default">30</td>
+                    <td class="config-desc">Minutes with zero incoming requests before the daemon shuts itself down gracefully. Set to <strong>0</strong> to disable (daemon runs forever until killed). The shell hook restarts it automatically on next use.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="callout-warn callout">
+            You probably don't need this file. The defaults are sensible. Only create it if you need to change the port (e.g., conflict with another service) or tweak the shutdown timing.
+        </div>
+    </div>
+
+    <!-- ═══ PROJECT CONFIG ═══ -->
+    <div class="doc-section" id="project-config">
+        <div class="section-label">Per-project</div>
+        <h2>Project Configuration</h2>
+        <p>Per-project settings that control how youwhatknow indexes a specific codebase. These live inside each project and are picked up automatically when the daemon first encounters that project.</p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span>your-project/.claude/youwhatknow.toml</span>
+                <span class="code-tag">optional</span>
+            </div>
+            <div class="code-body"><span class="c"># All fields are optional. These are the defaults.</span>
+<span class="k">summary_path</span> = <span class="s">".claude/summaries"</span>
+<span class="k">max_file_size_kb</span> = <span class="s">100</span>
+<span class="k">ignored_patterns</span> = []</div>
+        </div>
+
+        <table class="config-table">
+            <thead>
+                <tr>
+                    <th>Key</th>
+                    <th>Default</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="config-key">summary_path</td>
+                    <td class="config-default">".claude/summaries"</td>
+                    <td class="config-desc">Directory (relative to project root) where TOML summary files and the <code>.last-run</code> commit hash are stored.</td>
+                </tr>
+                <tr>
+                    <td class="config-key">max_file_size_kb</td>
+                    <td class="config-default">100</td>
+                    <td class="config-desc">Files larger than this (in KB) are skipped during indexing. Prevents huge generated files from bloating the index.</td>
+                </tr>
+                <tr>
+                    <td class="config-key">ignored_patterns</td>
+                    <td class="config-default">[]</td>
+                    <td class="config-desc">Additional glob patterns for files to skip. These are added on top of the built-in defaults (see below).</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Built-in ignore patterns</h3>
+        <p>These files are always skipped during indexing, regardless of your config:</p>
+        <div class="code-block">
+            <div class="code-header"><span>always ignored</span></div>
+            <div class="code-body"><span class="c"># Lock files</span>
+<span class="v">package-lock.json, yarn.lock, pnpm-lock.yaml</span>
+<span class="v">Cargo.lock, composer.lock, Gemfile.lock, poetry.lock</span>
+
+<span class="c"># Generated / minified</span>
+<span class="v">*.min.js, *.min.css, *.generated.*, *.bundle.*, *.map</span>
+
+<span class="c"># Binary files (detected by null bytes in first 512 bytes)</span>
+<span class="c"># Files exceeding max_file_size_kb</span></div>
+        </div>
+    </div>
+
+    <!-- ═══ HOOKS ═══ -->
+    <div class="doc-section" id="hooks">
+        <div class="section-label">Integration</div>
+        <h2>Claude Code Hooks</h2>
+        <p>youwhatknow uses Claude Code's <strong>HTTP hook</strong> system. Two hooks do all the work:</p>
+
+        <h3>PreToolUse / Read</h3>
+        <p>Fires before every <code>Read</code> tool call. The daemon receives the file path and session ID, looks up the file in the project index, and injects a summary into Claude's context. On repeat reads, it adds a warning.</p>
+
+        <h3>SessionStart / startup</h3>
+        <p>Fires when a new Claude Code session starts. The daemon injects a full project structure map so Claude knows where everything is from the start. No more exploratory file-reading spirals.</p>
+
+        <h3>What Claude sees</h3>
+        <p>On a <strong>first read</strong>, the injected context looks like:</p>
+        <div class="code-block">
+            <div class="code-header"><span>injected into Claude's context</span></div>
+            <div class="code-body"><span class="s">-- youwhatknow: src/config.rs --</span>
+<span class="v">Configuration loading and validation</span>
+<span class="v">Public: Config, ProjectConfig, load(), config_dir()</span>
+<span class="v">Folder: src/ &#8212; Core application logic</span></div>
+        </div>
+
+        <p>On a <strong>repeat read</strong> (2nd, 3rd, ...nth time):</p>
+        <div class="code-block">
+            <div class="code-header"><span>injected into Claude's context</span></div>
+            <div class="code-body"><span class="s">-- youwhatknow: src/config.rs (read 3x this session) --</span>
+<span class="k">This file was already read. Summary below &#8212; do you still need the full file?</span>
+<span class="v">Configuration loading and validation</span>
+<span class="v">Public: Config, ProjectConfig, load(), config_dir()</span></div>
+        </div>
+
+        <p>On <strong>session start</strong>:</p>
+        <div class="code-block">
+            <div class="code-header"><span>injected into Claude's context</span></div>
+            <div class="code-body"><span class="s">-- youwhatknow: project map --</span>
+<span class="v">src/ &#8212; Core application logic</span>
+<span class="v">  main.rs &#8212; Entry point, daemon startup</span>
+<span class="v">  config.rs &#8212; Configuration loading</span>
+<span class="v">  server.rs &#8212; Axum HTTP server</span>
+<span class="v">  hooks.rs &#8212; Hook handler logic</span>
+<span class="v">  ...</span></div>
+        </div>
+
+        <div class="callout">
+            The read always proceeds &#8212; youwhatknow never blocks Claude from reading a file. It just injects context so Claude can make a better decision about whether it needs the full content.
+        </div>
+    </div>
+
+    <!-- ═══ ENDPOINTS ═══ -->
+    <div class="doc-section" id="endpoints">
+        <div class="section-label">API</div>
+        <h2>HTTP Endpoints</h2>
+        <p>All endpoints listen on <strong>localhost</strong> only. No authentication required (and none supported &#8212; it's a local daemon).</p>
+
+        <div class="endpoint">
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/hook/pre-read</span>
+            <p>Called by Claude Code's PreToolUse hook. Receives the hook payload as JSON, returns a hook response with the file summary as <code>additionalContext</code>. The project is identified from the <code>cwd</code> field in the payload.</p>
+        </div>
+
+        <div class="endpoint">
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/hook/session-start</span>
+            <p>Called by Claude Code's SessionStart hook. Returns the project structure map as <code>additionalContext</code>. Triggers lazy project loading if this is the first request for the project.</p>
+        </div>
+
+        <div class="endpoint">
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/reindex</span>
+            <p>Triggers a full re-index of a project. Send a JSON body with a <code>cwd</code> field pointing to the project root. Returns <strong>202 Accepted</strong> immediately; indexing runs in the background.</p>
+        </div>
+
+        <div class="endpoint">
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/health</span>
+            <p>Health check. Returns JSON with <code>status</code> and <code>projects</code> (number of loaded project indexes). Useful for checking if the daemon is running.</p>
+        </div>
+    </div>
+
+    <!-- ═══ INDEXING ═══ -->
+    <div class="doc-section" id="indexing">
+        <div class="section-label">Under the hood</div>
+        <h2>Indexing &amp; Symbol Extraction</h2>
+
+        <h3>How files are discovered</h3>
+        <p>youwhatknow uses <code>git ls-files</code> to discover files, which means it automatically respects your <code>.gitignore</code>. Files are then filtered by size, binary detection, and ignore patterns.</p>
+
+        <h3>Symbol extraction</h3>
+        <p>Public symbols are extracted using <strong>tree-sitter</strong> grammars. This is what populates the "Public:" line in summaries.</p>
+
+        <div class="lang-grid">
+            <div class="lang-card">
+                <h4>Rust</h4>
+                <div class="exts">.rs</div>
+                <p>pub fn, pub struct, pub enum, pub trait, pub type</p>
+            </div>
+            <div class="lang-card">
+                <h4>TypeScript</h4>
+                <div class="exts">.ts .tsx</div>
+                <p>export function, class, interface, type, const</p>
+            </div>
+            <div class="lang-card">
+                <h4>JavaScript</h4>
+                <div class="exts">.js .jsx</div>
+                <p>export function, class, const (ES6 module syntax)</p>
+            </div>
+            <div class="lang-card">
+                <h4>Python</h4>
+                <div class="exts">.py</div>
+                <p>Top-level def, class definitions</p>
+            </div>
+            <div class="lang-card">
+                <h4>Go</h4>
+                <div class="exts">.go</div>
+                <p>Exported (capitalized) func, type, method</p>
+            </div>
+        </div>
+
+        <p>Files with unrecognized extensions still get indexed &#8212; they just won't have symbol information. The description and folder context still work.</p>
+
+        <h3>Description generation</h3>
+        <p>File descriptions are generated in two ways:</p>
+        <p><strong>Primary:</strong> Batched calls to <code>claude --model haiku --print</code>. The first 100 lines of each file plus extracted symbols are sent to Haiku in batches of 15. Haiku returns a one-line description per file.</p>
+        <p><strong>Fallback:</strong> If the <code>claude</code> CLI isn't available (or the call fails), descriptions are derived from the filename and symbols. For example: <code>session.rs</code> with symbols <code>SessionTracker, track_read</code> becomes "Session &#8212; SessionTracker, track_read".</p>
+
+        <h3>Incremental re-indexing</h3>
+        <p>On subsequent daemon startups (for a given project), youwhatknow uses <code>git diff</code> against the last-known commit hash to find changed files and only re-indexes those. The commit hash is stored in <code>.claude/summaries/.last-run</code>.</p>
+    </div>
+
+    <!-- ═══ STORAGE ═══ -->
+    <div class="doc-section" id="storage">
+        <div class="section-label">Data</div>
+        <h2>Storage Format</h2>
+        <p>Summaries are stored as human-readable TOML files in each project's <code>.claude/summaries/</code> directory. You can edit them by hand if you want &#8212; the daemon loads them on startup.</p>
+
+        <h3>Per-folder summary</h3>
+        <div class="code-block">
+            <div class="code-header"><span>.claude/summaries/src.toml</span></div>
+            <div class="code-body"><span class="k">generated</span> = <span class="s">"2026-03-21T10:00:00Z"</span>
+<span class="k">description</span> = <span class="s">"Core application logic"</span>
+
+<span class="k">[files."main.rs"]</span>
+<span class="k">path</span> = <span class="s">"src/main.rs"</span>
+<span class="k">description</span> = <span class="s">"Entry point, daemon startup"</span>
+<span class="k">symbols</span> = [<span class="s">"main()"</span>]
+<span class="k">summarized</span> = <span class="s">"2026-03-21T10:00:00Z"</span></div>
+        </div>
+
+        <h3>Project summary</h3>
+        <div class="code-block">
+            <div class="code-header"><span>.claude/summaries/project-summary.toml</span></div>
+            <div class="code-body"><span class="k">generated</span> = <span class="s">"2026-03-21T10:00:00Z"</span>
+<span class="k">last_commit</span> = <span class="s">"abc123"</span>
+
+<span class="k">[folders.src]</span>
+<span class="k">path</span> = <span class="s">"src/"</span>
+<span class="k">description</span> = <span class="s">"Core application logic"</span></div>
+        </div>
+
+        <p>Nested folders use <code>--</code> as a separator in filenames: <code>src/indexer/</code> becomes <code>src--indexer.toml</code>.</p>
+        <p>All writes are <strong>atomic</strong> (write to temp file, then rename) so you'll never see a partially-written summary file.</p>
+    </div>
+
+    <!-- ═══ ENV VARS ═══ -->
+    <div class="doc-section" id="env-vars">
+        <div class="section-label">Environment</div>
+        <h2>Environment Variables</h2>
+        <p>All daemon config options can be overridden via environment variables with the <strong>YOUWHATKNOW_</strong> prefix:</p>
+
+        <table class="config-table">
+            <thead>
+                <tr>
+                    <th>Variable</th>
+                    <th>Equivalent config</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="config-key">YOUWHATKNOW_PORT</td>
+                    <td class="config-desc">port</td>
+                </tr>
+                <tr>
+                    <td class="config-key">YOUWHATKNOW_SESSION_TIMEOUT_MINUTES</td>
+                    <td class="config-desc">session_timeout_minutes</td>
+                </tr>
+                <tr>
+                    <td class="config-key">YOUWHATKNOW_IDLE_SHUTDOWN_MINUTES</td>
+                    <td class="config-desc">idle_shutdown_minutes</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>Environment variables take precedence over the config file. Useful for quick overrides without editing TOML:</p>
+        <div class="code-block">
+            <div class="code-header"><span>terminal</span></div>
+            <div class="code-body"><span class="c"># Run on a different port, never auto-shutdown</span>
+<span class="s">$</span> YOUWHATKNOW_PORT=9000 YOUWHATKNOW_IDLE_SHUTDOWN_MINUTES=0 youwhatknow</div>
+        </div>
+    </div>
+
+    <!-- ═══ LIFECYCLE ═══ -->
+    <div class="doc-section" id="lifecycle">
+        <div class="section-label">Operations</div>
+        <h2>Lifecycle &amp; PID Management</h2>
+
+        <h3>PID file</h3>
+        <p>The daemon writes its PID to <code>~/.local/share/youwhatknow/youwhatknow.pid</code> on startup and removes it on shutdown. The shell hook uses this to check if the daemon is already running.</p>
+
+        <h3>Starting</h3>
+        <p>Just run <code>youwhatknow</code>. If the port is already in use, it exits with an error (another instance is likely running).</p>
+
+        <h3>Stopping</h3>
+        <p>Three ways the daemon stops:</p>
+        <p><strong>Ctrl+C / SIGTERM</strong> &#8212; graceful shutdown. Finishes in-flight requests, cleans up PID file.</p>
+        <p><strong>Idle timeout</strong> &#8212; after <code>idle_shutdown_minutes</code> with no requests, the daemon shuts itself down gracefully. Same cleanup as Ctrl+C.</p>
+        <p><strong>Manual kill</strong> &#8212; <code>kill $(cat ~/.local/share/youwhatknow/youwhatknow.pid)</code>. PID file may be left behind; the shell hook handles stale PID files on next startup.</p>
+
+        <h3>Multi-project</h3>
+        <p>One daemon handles all projects. When a hook request arrives with a <code>cwd</code> the daemon hasn't seen before, it loads the project config, reads existing summaries from disk, and starts background indexing. No per-project daemon instances needed.</p>
+    </div>
+
+    <!-- ═══ NIX ═══ -->
+    <div class="doc-section" id="nix">
+        <div class="section-label">Nix</div>
+        <h2>Nix Integration</h2>
+        <p>The project's <code>flake.nix</code> provides a package and a shell hook. If you use Nix, you can add youwhatknow to your dev shell and have it start automatically.</p>
+
+        <h3>As a flake input</h3>
+        <div class="code-block">
+            <div class="code-header"><span>your-project/flake.nix</span></div>
+            <div class="code-body"><span class="c"># Add youwhatknow as an input</span>
+<span class="k">inputs.youwhatknow.url</span> = <span class="s">"github:wavefunk/youwhatknow"</span>;
+
+<span class="c"># In your devShell packages:</span>
+<span class="v">packages = [ youwhatknow.packages.${system}.default ];</span>
+
+<span class="c"># Optional: use the shell hook to auto-start</span>
+<span class="v">shellHook = youwhatknow.devShells.${system}.default.shellHook;</span></div>
+        </div>
+
+        <h3>Shell hook behavior</h3>
+        <p>The shell hook checks if the daemon is already running (via PID file). If not, it starts it in the background with <code>disown</code>. It only runs if both <code>claude</code> and <code>youwhatknow</code> are on PATH.</p>
+
+        <h3>Build caching</h3>
+        <p>The flake uses source filtering &#8212; only <code>src/</code>, <code>Cargo.toml</code>, and <code>Cargo.lock</code> affect the build hash. Editing <code>flake.nix</code>, docs, or other files won't trigger a rebuild.</p>
+    </div>
+
+</div>
+
+<footer>
+    <div class="container">
+        <div class="footer-logo">youwhat(k)now</div>
+        <p style="margin-bottom: 0.75rem;">
+            <a href="index.html" style="font-size: 12px; margin-right: 1.5rem;">Home</a>
+            <a href="https://github.com/wavefunk/youwhatknow" style="font-size: 12px;">GitHub</a>
+        </p>
+        <p>Built with Rust, Tokio, Axum, and tree-sitter.</p>
+    </div>
+</footer>
+
+</body>
+</html>
