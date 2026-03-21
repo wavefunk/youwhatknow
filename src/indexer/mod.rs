@@ -156,7 +156,6 @@ impl Index {
     }
 
     /// Mark the index as ready.
-    #[cfg(test)]
     pub fn set_ready(&self, ready: bool) {
         self.inner.ready.store(ready, Ordering::Relaxed);
     }

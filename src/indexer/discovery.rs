@@ -164,6 +164,36 @@ fn is_binary(path: &Path) -> bool {
     buf[..n].contains(&0)
 }
 
+/// Resolve the main worktree root for a given path.
+///
+/// For regular repos, returns the repo root (same as `--show-toplevel`).
+/// For linked worktrees, returns the main worktree's root.
+/// This lets worktrees share an already-loaded project index.
+pub fn resolve_main_worktree(cwd: &Path) -> eyre::Result<PathBuf> {
+    let output = Command::new("git")
+        .args(["rev-parse", "--path-format=absolute", "--git-common-dir"])
+        .current_dir(cwd)
+        .output()
+        .context("running git rev-parse --git-common-dir")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("git rev-parse --git-common-dir failed: {stderr}");
+    }
+
+    let git_common = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
+    // git-common-dir points to the .git directory of the main worktree.
+    // Its parent is the main worktree root.
+    let main_root = git_common
+        .parent()
+        .ok_or_else(|| eyre::eyre!("git-common-dir has no parent: {}", git_common.display()))?;
+
+    // Canonicalize to resolve symlinks and get a stable key
+    main_root
+        .canonicalize()
+        .with_context(|| format!("canonicalizing {}", main_root.display()))
+}
+
 /// Get the parent folder of a relative path as a string.
 /// e.g., "src/main.rs" -> "src", "main.rs" -> ""
 pub fn file_folder(rel_path: &Path) -> String {
@@ -243,6 +273,16 @@ mod tests {
         let patterns: Vec<&str> = vec![];
         // 100KB limit
         assert!(!should_index(&file, Path::new("big.rs"), 102400, &patterns));
+    }
+
+    #[test]
+    fn resolve_main_worktree_in_regular_repo() {
+        // In a non-worktree repo, resolve_main_worktree should return
+        // the same path as git rev-parse --show-toplevel
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let resolved = resolve_main_worktree(root).expect("resolve");
+        let expected = root.canonicalize().expect("canonicalize");
+        assert_eq!(resolved, expected);
     }
 
     #[test]

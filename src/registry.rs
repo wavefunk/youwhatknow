@@ -6,6 +6,7 @@ use tokio::sync::RwLock;
 
 use crate::config::ProjectConfig;
 use crate::indexer::Index;
+use crate::indexer::discovery;
 
 /// Manages per-project indexes. Thread-safe, lazily loads projects on first request.
 #[derive(Clone)]
@@ -31,53 +32,113 @@ impl ProjectRegistry {
         }
     }
 
+    /// Register a path as an alias for an existing project entry.
+    /// Used internally when a worktree resolves to a known main root.
+    #[cfg(test)]
+    pub async fn register_alias(&self, alias: &Path, canonical: &Path) {
+        let mut state = self.inner.write().await;
+        if let Some(entry) = state.projects.get(canonical) {
+            let cloned = ProjectEntry {
+                index: entry.index.clone(),
+                config: entry.config.clone(),
+            };
+            state.projects.insert(alias.to_path_buf(), cloned);
+        }
+    }
+
     /// Get the index for a project, loading it lazily if not already known.
     /// Returns (Index, ProjectConfig) for the project.
-    pub async fn get_or_load(&self, project_root: &Path) -> (Index, ProjectConfig) {
-        // Fast path: already loaded (read lock)
+    pub async fn get_or_load(&self, cwd: &Path) -> (Index, ProjectConfig) {
+        // Canonicalize cwd for stable comparison with main_root (which is also canonicalized)
+        let cwd = &cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf());
+
+        // Fast path: cwd already registered (read lock)
         {
             let state = self.inner.read().await;
-            if let Some(entry) = state.projects.get(project_root) {
+            if let Some(entry) = state.projects.get(cwd) {
                 return (entry.index.clone(), entry.config.clone());
             }
         }
 
-        // Slow path: acquire write lock and double-check before inserting
+        // Resolve to main worktree root for canonical keying
+        let main_root = discovery::resolve_main_worktree(cwd)
+            .unwrap_or_else(|_| cwd.to_path_buf());
+
         let mut state = self.inner.write().await;
 
-        // Another request may have loaded this project while we waited for the lock
-        if let Some(entry) = state.projects.get(project_root) {
+        // Double-check cwd after acquiring write lock
+        if let Some(entry) = state.projects.get(cwd) {
             return (entry.index.clone(), entry.config.clone());
         }
 
-        let config = ProjectConfig::load(project_root).unwrap_or_default();
+        // Check if main_root already has an entry (worktree of known project)
+        if main_root != *cwd {
+            if let Some(entry) = state.projects.get(&main_root) {
+                let alias = ProjectEntry {
+                    index: entry.index.clone(),
+                    config: entry.config.clone(),
+                };
+                let result = (alias.index.clone(), alias.config.clone());
+                // Register cwd as alias so future lookups are fast
+                state.projects.insert(cwd.to_path_buf(), alias);
+                tracing::info!(
+                    worktree = %cwd.display(),
+                    main = %main_root.display(),
+                    "linked worktree to existing project index"
+                );
+                return result;
+            }
+        }
+
+        // New project
+        let config = ProjectConfig::load(cwd).unwrap_or_default();
         let index = Index::new();
 
-        // Load existing summaries from disk
-        index.load_from_disk(project_root, &config).await;
+        // Load existing summaries from main worktree (they're gitignored,
+        // so only the main worktree has them on disk)
+        index.load_from_disk(&main_root, &config).await;
 
-        // Start background indexing
-        let bg_index = index.clone();
-        let bg_root = project_root.to_path_buf();
-        let bg_config = config.clone();
-        tokio::spawn(async move {
-            let summary_dir = bg_root.join(&bg_config.summary_path);
-            if crate::storage::read_last_run(&summary_dir).is_some() {
-                bg_index.incremental_index(&bg_root, &bg_config).await;
-            } else {
-                bg_index.full_index(&bg_root, &bg_config).await;
-            }
-        });
+        // Only run background indexing for the main worktree.
+        // Worktrees share the main index and don't write their own summaries.
+        let is_worktree = main_root != *cwd;
+        if !is_worktree {
+            let bg_index = index.clone();
+            let bg_root = cwd.to_path_buf();
+            let bg_config = config.clone();
+            tokio::spawn(async move {
+                let summary_dir = bg_root.join(&bg_config.summary_path);
+                if crate::storage::read_last_run(&summary_dir).is_some() {
+                    bg_index.incremental_index(&bg_root, &bg_config).await;
+                } else {
+                    bg_index.full_index(&bg_root, &bg_config).await;
+                }
+            });
+        } else {
+            // Worktree with no main entry yet — mark ready immediately
+            // since we loaded what we could from disk
+            index.set_ready(true);
+        }
 
-        state.projects.insert(
-            project_root.to_path_buf(),
-            ProjectEntry {
+        let entry = ProjectEntry {
+            index: index.clone(),
+            config: config.clone(),
+        };
+
+        // Register under main_root too so future worktrees find it
+        if is_worktree {
+            state.projects.insert(main_root.clone(), ProjectEntry {
                 index: index.clone(),
                 config: config.clone(),
-            },
-        );
+            });
+            tracing::info!(
+                worktree = %cwd.display(),
+                main_root = %main_root.display(),
+                "registered worktree with shared index"
+            );
+        }
+        state.projects.insert(cwd.to_path_buf(), entry);
 
-        tracing::info!(project = %project_root.display(), "registered new project");
+        tracing::info!(project = %cwd.display(), "registered new project");
         (index, config)
     }
 
@@ -146,5 +207,27 @@ mod tests {
         let tmp = tempfile::tempdir().expect("tempdir");
 
         assert!(registry.get(tmp.path()).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn worktree_alias_shares_index() {
+        let registry = ProjectRegistry::new();
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let main_root = tmp.path().to_path_buf();
+
+        // Simulate: main project is loaded
+        let (index1, _) = registry.get_or_load(&main_root).await;
+
+        // Simulate: a worktree path resolves to the same main_root.
+        // We test register_alias directly since we can't create real worktrees in tests.
+        let worktree_path = PathBuf::from("/fake/worktree/path");
+        registry.register_alias(&worktree_path, &main_root).await;
+
+        let (index2, _) = registry.get_or_load(&worktree_path).await;
+
+        // Mutate one and observe the other to prove they share the same Arc
+        index1.set_ready(true);
+        assert!(index2.is_ready(), "should share the same underlying Arc");
+        assert_eq!(registry.project_count().await, 2); // two keys, same index
     }
 }
