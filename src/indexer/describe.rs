@@ -169,6 +169,149 @@ async fn generate_batch(
     Ok(descriptions)
 }
 
+/// Generate descriptions for folders by batching them through `claude` CLI with Haiku.
+/// Returns a map from folder path to one-line description.
+pub async fn generate_folder_descriptions(
+    project_root: &Path,
+    folders: &[(String, Vec<String>)],
+    concurrency: usize,
+) -> HashMap<String, String> {
+    let concurrency = concurrency.max(1);
+
+    if !claude_available().await {
+        tracing::warn!("claude CLI not found; using fallback folder descriptions");
+        let mut descriptions = HashMap::new();
+        for (folder_path, _) in folders {
+            descriptions.insert(folder_path.clone(), fallback_folder_description(folder_path));
+        }
+        return descriptions;
+    }
+
+    let total_batches = folders.chunks(10).len();
+    tracing::info!(
+        folders = folders.len(),
+        batches = total_batches,
+        concurrency,
+        "generating folder descriptions"
+    );
+
+    let batches: Vec<Vec<(String, Vec<String>)>> =
+        folders.chunks(10).map(|c| c.to_vec()).collect();
+
+    let results: Vec<_> = stream::iter(
+        batches.into_iter().enumerate().map(|(i, batch)| {
+            let project_root = project_root.to_owned();
+            async move {
+                generate_folder_batch(&project_root, &batch, i + 1, total_batches).await
+            }
+        })
+    )
+    .buffered(concurrency)
+    .collect()
+    .await;
+
+    let mut descriptions = HashMap::new();
+    for (result, batch) in results.into_iter().zip(folders.chunks(10)) {
+        match result {
+            Ok(batch_descs) => {
+                descriptions.extend(batch_descs);
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "folder batch failed; using fallbacks");
+                for (folder_path, _) in batch {
+                    descriptions
+                        .entry(folder_path.clone())
+                        .or_insert_with(|| fallback_folder_description(folder_path));
+                }
+            }
+        }
+    }
+
+    tracing::info!(
+        described = descriptions.len(),
+        folders = folders.len(),
+        "folder descriptions complete"
+    );
+
+    descriptions
+}
+
+/// Generate descriptions for a single batch of folders via claude CLI.
+async fn generate_folder_batch(
+    project_root: &Path,
+    batch: &[(String, Vec<String>)],
+    batch_num: usize,
+    total_batches: usize,
+) -> eyre::Result<HashMap<String, String>> {
+    tracing::info!(batch = batch_num, total = total_batches, folders = batch.len(), "starting folder batch");
+
+    let mut prompt = String::from(
+        "For each folder below, write exactly one short description (max 12 words) \
+         summarizing its purpose based on the files it contains. \
+         Output format: one line per folder as `FOLDER_PATH: description`. Nothing else.\n\n",
+    );
+
+    for (folder_path, file_descs) in batch {
+        tracing::trace!(batch = batch_num, folder = folder_path, "describing folder");
+        prompt.push_str(&format!("FOLDER: {folder_path}\nFILES:\n"));
+        for desc in file_descs {
+            prompt.push_str(&format!("- {desc}\n"));
+        }
+        prompt.push_str("---\n");
+    }
+
+    let mut child = tokio::process::Command::new("claude")
+        .args([
+            "--dangerously-skip-permissions",
+            "--model",
+            "haiku",
+            "--print",
+        ])
+        .current_dir(project_root)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        tokio::io::AsyncWriteExt::write_all(&mut stdin, prompt.as_bytes()).await?;
+    }
+
+    let output = child.wait_with_output().await?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        eyre::bail!("claude CLI failed: {stderr}");
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut descriptions = HashMap::new();
+
+    for line in stdout.lines() {
+        if let Some((path_str, desc)) = line.split_once(':') {
+            let path_str = path_str.trim();
+            let desc = desc.trim();
+            if !path_str.is_empty() && !desc.is_empty() {
+                descriptions.insert(path_str.to_owned(), desc.to_owned());
+            }
+        }
+    }
+
+    for (folder_path, _) in batch {
+        descriptions
+            .entry(folder_path.clone())
+            .or_insert_with(|| fallback_folder_description(folder_path));
+    }
+
+    tracing::info!(batch = batch_num, total = total_batches, described = descriptions.len(), "completed folder batch");
+
+    Ok(descriptions)
+}
+
+fn fallback_folder_description(folder_path: &str) -> String {
+    folder_path.to_owned()
+}
+
 /// Read the first N lines of a file as a preview string.
 fn read_preview(path: &Path, max_lines: usize) -> String {
     let Ok(content) = std::fs::read_to_string(path) else {
@@ -258,5 +401,11 @@ mod tests {
         assert_eq!(capitalize_first("hello"), "Hello");
         assert_eq!(capitalize_first(""), "");
         assert_eq!(capitalize_first("H"), "H");
+    }
+
+    #[test]
+    fn fallback_folder_description_returns_path() {
+        let desc = fallback_folder_description("src/indexer");
+        assert_eq!(desc, "src/indexer");
     }
 }
