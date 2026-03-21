@@ -1,18 +1,20 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+
+use futures::stream::{self, StreamExt};
 
 /// Generate descriptions for files by batching them through `claude` CLI with Haiku.
 /// Returns a map from file path to one-line description.
-pub fn generate_descriptions(
+pub async fn generate_descriptions(
     project_root: &Path,
     files: &[(PathBuf, Vec<String>)],
+    concurrency: usize,
 ) -> HashMap<PathBuf, String> {
-    let mut descriptions = HashMap::new();
+    let concurrency = concurrency.max(1);
 
-    // Check if claude CLI is available
-    if !claude_available() {
+    if !claude_available().await {
         tracing::warn!("claude CLI not found; using fallback descriptions");
+        let mut descriptions = HashMap::new();
         for (path, symbols) in files {
             let filename = path
                 .file_name()
@@ -23,14 +25,37 @@ pub fn generate_descriptions(
         return descriptions;
     }
 
-    // Process in batches of 15
-    for batch in files.chunks(15) {
-        match generate_batch(project_root, batch) {
+    let total_batches = files.chunks(15).len();
+    tracing::info!(
+        files = files.len(),
+        batches = total_batches,
+        concurrency,
+        "generating file descriptions"
+    );
+
+    let batches: Vec<Vec<(PathBuf, Vec<String>)>> =
+        files.chunks(15).map(|c| c.to_vec()).collect();
+
+    let results: Vec<_> = stream::iter(
+        batches.into_iter().enumerate().map(|(i, batch)| {
+            let project_root = project_root.to_owned();
+            async move {
+                generate_batch(&project_root, &batch, i + 1, total_batches).await
+            }
+        })
+    )
+    .buffered(concurrency)
+    .collect()
+    .await;
+
+    let mut descriptions = HashMap::new();
+    for (result, batch) in results.into_iter().zip(files.chunks(15)) {
+        match result {
             Ok(batch_descs) => {
                 descriptions.extend(batch_descs);
             }
             Err(e) => {
-                tracing::warn!("batch description generation failed: {e}; using fallbacks");
+                tracing::warn!(error = %e, "batch failed; using fallbacks");
                 for (path, symbols) in batch {
                     let filename = path
                         .file_name()
@@ -44,20 +69,36 @@ pub fn generate_descriptions(
         }
     }
 
+    tracing::info!(
+        described = descriptions.len(),
+        files = files.len(),
+        "file descriptions complete"
+    );
+
     descriptions
 }
 
 /// Generate descriptions for a single batch via claude CLI.
-fn generate_batch(
+async fn generate_batch(
     project_root: &Path,
     batch: &[(PathBuf, Vec<String>)],
+    batch_num: usize,
+    total_batches: usize,
 ) -> eyre::Result<HashMap<PathBuf, String>> {
+    tracing::info!(
+        batch = batch_num,
+        total = total_batches,
+        files = batch.len(),
+        "starting batch"
+    );
+
     let mut prompt = String::from(
         "For each file below, write exactly one short description (max 12 words). \
          Output format: one line per file as `PATH: description`. Nothing else.\n\n",
     );
 
     for (path, symbols) in batch {
+        tracing::trace!(batch = batch_num, file = %path.display(), "describing file");
         let abs_path = project_root.join(path);
         let preview = read_preview(&abs_path, 100);
         prompt.push_str(&format!("FILE: {}\n", path.display()));
@@ -70,7 +111,7 @@ fn generate_batch(
         prompt.push_str("---\n");
     }
 
-    let mut child = Command::new("claude")
+    let mut child = tokio::process::Command::new("claude")
         .args([
             "--dangerously-skip-permissions",
             "--model",
@@ -84,12 +125,10 @@ fn generate_batch(
         .spawn()?;
 
     if let Some(mut stdin) = child.stdin.take() {
-        use std::io::Write;
-        stdin.write_all(prompt.as_bytes())?;
-        // stdin is dropped here, closing the pipe
+        tokio::io::AsyncWriteExt::write_all(&mut stdin, prompt.as_bytes()).await?;
     }
 
-    let output = child.wait_with_output()?;
+    let output = child.wait_with_output().await?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -119,6 +158,13 @@ fn generate_batch(
             descriptions.insert(path.clone(), fallback_description(filename, symbols));
         }
     }
+
+    tracing::info!(
+        batch = batch_num,
+        total = total_batches,
+        described = descriptions.len(),
+        "completed batch"
+    );
 
     Ok(descriptions)
 }
@@ -168,12 +214,13 @@ fn capitalize_first(s: &str) -> String {
 }
 
 /// Check if `claude` CLI is available on PATH.
-fn claude_available() -> bool {
-    Command::new("claude")
+async fn claude_available() -> bool {
+    tokio::process::Command::new("claude")
         .arg("--version")
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .status()
+        .await
         .is_ok_and(|s| s.success())
 }
 

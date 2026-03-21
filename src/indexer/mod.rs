@@ -285,8 +285,11 @@ impl Index {
         }
 
         // Generate descriptions
-        let descriptions =
-            describe::generate_descriptions(project_root, &file_symbols);
+        let descriptions = describe::generate_descriptions(
+            project_root,
+            &file_symbols,
+            config.max_concurrent_batches,
+        ).await;
 
         // Build FileSummary entries and group by folder
         let now = Utc::now();
