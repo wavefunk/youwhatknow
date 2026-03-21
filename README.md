@@ -1,9 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120' width='120' height='120'%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='Georgia,serif' font-style='italic' font-size='72' fill='%2339ff85'%3E!%3F%3C/text%3E%3C/svg%3E">
-    <source media="(prefers-color-scheme: light)" srcset="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120' width='120' height='120'%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='Georgia,serif' font-style='italic' font-size='72' fill='%23111114'%3E!%3F%3C/text%3E%3C/svg%3E">
-    <img alt="youwhatknow" width="120" height="120" src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120' width='120' height='120'%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='Georgia,serif' font-style='italic' font-size='72' fill='%2339ff85'%3E!%3F%3C/text%3E%3C/svg%3E">
-  </picture>
+  <img alt="!?" src="docs/logo.svg" width="120" height="120">
 </p>
 
 <h3 align="center"><em>you what (k)now?</em></h3>
