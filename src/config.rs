@@ -63,6 +63,8 @@ pub struct ProjectConfig {
     pub ignored_patterns: Vec<String>,
     #[serde(default = "default_max_file_size")]
     pub max_file_size_kb: u64,
+    #[serde(default = "default_max_concurrent_batches")]
+    pub max_concurrent_batches: usize,
 }
 
 fn default_summary_path() -> String {
@@ -71,6 +73,9 @@ fn default_summary_path() -> String {
 fn default_max_file_size() -> u64 {
     100
 }
+fn default_max_concurrent_batches() -> usize {
+    4
+}
 
 impl Default for ProjectConfig {
     fn default() -> Self {
@@ -78,6 +83,7 @@ impl Default for ProjectConfig {
             summary_path: default_summary_path(),
             ignored_patterns: Vec::new(),
             max_file_size_kb: default_max_file_size(),
+            max_concurrent_batches: default_max_concurrent_batches(),
         }
     }
 }
@@ -159,6 +165,12 @@ mod tests {
         assert_eq!(config.summary_path, ".claude/summaries");
         assert_eq!(config.max_file_size_kb, 100);
         assert!(config.ignored_patterns.is_empty());
+    }
+
+    #[test]
+    fn default_project_config_has_concurrent_batches() {
+        let config = ProjectConfig::default();
+        assert_eq!(config.max_concurrent_batches, 4);
     }
 
     #[test]

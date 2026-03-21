@@ -32,6 +32,7 @@ tree-sitter-go = "0.25.0"
 streaming-iterator = "0.1.9"
 tower = { version = "0.5.3", features = ["util"] }
 http = "1.4.0"
+futures = "0.3"
 
 [profile.dev]
 incremental = true
