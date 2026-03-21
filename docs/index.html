@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>youwhatknow &mdash; stop Claude from reading the same file 47 times</title>
+    <title>youwhatknow &mdash; Claude, buddy, you already read that file</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Mono:wght@400;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
@@ -17,7 +17,6 @@
             --amber: #ffb830;
             --amber-dim: #ffb83033;
             --red: #ff4f4f;
-            --red-dim: #ff4f4f22;
             --text: #c8c8d0;
             --text-dim: #5a5a6e;
             --border: #1e1e28;
@@ -62,13 +61,10 @@
         a:hover { text-decoration: underline; }
         .container { max-width: 900px; margin: 0 auto; padding: 0 2rem; }
 
+        /* ── Hero ── */
         .hero {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            position: relative;
-            padding: 4rem 0;
+            padding: 8rem 0 4rem;
+            text-align: center;
         }
 
         .hero-badge {
@@ -84,13 +80,11 @@
             border-radius: 2px;
             margin-bottom: 2.5rem;
             background: var(--glow-dim);
-            width: fit-content;
             animation: fadeSlideUp 0.8s ease both;
         }
 
         .hero-badge-dot {
-            width: 6px;
-            height: 6px;
+            width: 6px; height: 6px;
             background: var(--glow);
             border-radius: 50%;
             display: inline-block;
@@ -99,12 +93,12 @@
 
         .hero h1 {
             font-family: var(--serif);
-            font-size: clamp(3.5rem, 8vw, 6.5rem);
+            font-size: clamp(3.5rem, 9vw, 7rem);
             font-weight: 400;
             font-style: italic;
             line-height: 1;
             color: #fff;
-            margin-bottom: 0.25em;
+            margin-bottom: 0.5em;
             animation: fadeSlideUp 0.8s ease 0.1s both;
         }
 
@@ -114,12 +108,21 @@
             text-shadow: 0 0 40px var(--glow-dim), 0 0 80px var(--glow-dim);
         }
 
-        .hero-sub {
-            font-size: 1.15rem;
+        .hero-tagline {
+            font-family: var(--serif);
+            font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+            font-style: italic;
             color: var(--text-dim);
-            max-width: 520px;
+            margin-bottom: 1rem;
+            animation: fadeSlideUp 0.8s ease 0.15s both;
+        }
+
+        .hero-sub {
+            font-size: 0.95rem;
+            color: var(--text-dim);
+            max-width: 560px;
+            margin: 0 auto 3rem;
             line-height: 1.8;
-            margin-bottom: 3rem;
             animation: fadeSlideUp 0.8s ease 0.2s both;
         }
 
@@ -150,13 +153,18 @@
             box-shadow: 0 0 30px var(--glow-dim);
         }
 
-        .terminal-float {
-            position: absolute;
-            right: -60px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 380px;
-            animation: fadeSlideLeft 1s ease 0.5s both;
+        /* ── Terminal ── */
+        .terminal-section {
+            padding: 3rem 0 6rem;
+            animation: fadeSlideUp 1s ease 0.5s both;
+        }
+
+        .terminal-label {
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-dim);
+            margin-bottom: 1.5rem;
+            font-style: italic;
         }
 
         .terminal {
@@ -164,8 +172,10 @@
             border: 1px solid var(--border);
             border-radius: 6px;
             overflow: hidden;
-            font-size: 11.5px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 1px var(--border);
+            font-size: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            max-width: 650px;
+            margin: 0 auto;
         }
 
         .terminal-bar {
@@ -186,13 +196,11 @@
             margin-left: auto;
             font-size: 10px;
             color: var(--text-dim);
-            letter-spacing: 0.05em;
         }
 
         .terminal-body {
-            padding: 14px;
-            min-height: 260px;
-            position: relative;
+            padding: 16px;
+            min-height: 320px;
         }
 
         .term-line {
@@ -200,7 +208,6 @@
             opacity: 0;
             animation: termFadeIn 0.15s ease forwards;
             white-space: nowrap;
-            font-size: 11.5px;
         }
 
         .t-prompt { color: var(--glow); }
@@ -213,15 +220,15 @@
 
         .cursor-blink {
             display: inline-block;
-            width: 7px;
-            height: 14px;
+            width: 7px; height: 14px;
             background: var(--glow);
             animation: blink 1s step-end infinite;
             vertical-align: middle;
             margin-left: 2px;
         }
 
-        section { padding: 6rem 0; }
+        /* ── Sections ── */
+        section { padding: 5rem 0; }
 
         .section-label {
             font-size: 10px;
@@ -252,43 +259,60 @@
         }
 
         .muted { color: var(--text-dim); max-width: 600px; }
+        .muted strong { color: var(--text); font-weight: 500; }
 
-        .problem-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
+        /* ── Conversation bubbles for the problem section ── */
+        .convo {
             margin-top: 3rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            max-width: 620px;
         }
 
-        .problem-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            padding: 2rem;
+        .bubble {
+            padding: 1rem 1.5rem;
+            border-radius: 4px;
+            font-size: 13.5px;
+            line-height: 1.6;
             position: relative;
-            overflow: hidden;
-            border-top: 2px solid var(--red);
+            animation: fadeSlideUp 0.5s ease both;
         }
 
-        .problem-card h3 {
-            font-family: var(--display);
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--red);
-            margin-bottom: 0.75rem;
+        .bubble-claude {
+            background: #161620;
+            border: 1px solid var(--border);
+            align-self: flex-start;
+            border-left: 3px solid var(--amber);
         }
 
-        .problem-card p { font-size: 13px; color: var(--text-dim); line-height: 1.7; }
-
-        .problem-stat {
-            font-family: var(--serif);
-            font-size: 3rem;
+        .bubble-you {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            align-self: flex-end;
+            border-right: 3px solid var(--red);
+            text-align: right;
             font-style: italic;
             color: var(--red);
-            display: block;
-            margin-bottom: 0.5rem;
         }
 
+        .bubble-ywk {
+            background: #0d1a10;
+            border: 1px solid #1a3d1f;
+            align-self: flex-start;
+            border-left: 3px solid var(--glow);
+            color: var(--glow);
+        }
+
+        .bubble-who {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.3rem;
+            opacity: 0.6;
+        }
+
+        /* ── How it works ── */
         .flow { display: grid; gap: 0; margin-top: 3rem; }
 
         .flow-step {
@@ -315,7 +339,6 @@
             font-size: 14px;
             color: #fff;
             margin-bottom: 0.5rem;
-            letter-spacing: 0.02em;
         }
 
         .flow-step p { font-size: 13px; color: var(--text-dim); line-height: 1.7; }
@@ -330,6 +353,14 @@
             border: 1px solid var(--glow-dim);
         }
 
+        .flow-aside {
+            font-size: 12px;
+            color: var(--text-dim);
+            font-style: italic;
+            margin-top: 0.5rem;
+        }
+
+        /* ── Architecture ── */
         .arch-diagram {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -375,9 +406,9 @@
             margin: 0.75rem 0;
             color: var(--text-dim);
             font-size: 13px;
-            letter-spacing: 0.05em;
         }
 
+        /* ── Benefits ── */
         .benefits-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -401,6 +432,7 @@
 
         .benefit p { font-size: 12.5px; color: var(--text-dim); line-height: 1.7; }
 
+        /* ── Setup ── */
         .setup-block {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -424,7 +456,6 @@
             background: var(--glow-dim);
             padding: 0.2em 0.6em;
             font-size: 10px;
-            letter-spacing: 0.05em;
         }
 
         .setup-code {
@@ -440,6 +471,7 @@
         .s { color: var(--glow); }
         .c { color: var(--text-dim); font-style: italic; }
 
+        /* ── Footer ── */
         footer {
             border-top: 1px solid var(--border);
             padding: 3rem 0;
@@ -457,14 +489,18 @@
             margin-bottom: 0.5rem;
         }
 
+        .footer-quip {
+            font-family: var(--serif);
+            font-style: italic;
+            font-size: 14px;
+            color: var(--text-dim);
+            margin-top: 1rem;
+        }
+
+        /* ── Animations ── */
         @keyframes fadeSlideUp {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes fadeSlideLeft {
-            from { opacity: 0; transform: translate(30px, -50%); }
-            to { opacity: 1; transform: translate(0, -50%); }
         }
 
         @keyframes pulse {
@@ -488,152 +524,158 @@
             transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        .reveal.visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
+        .reveal.visible { opacity: 1; transform: translateY(0); }
 
         @media (max-width: 900px) {
-            .terminal-float {
-                position: relative;
-                right: 0;
-                top: 0;
-                transform: none;
-                width: 100%;
-                margin-top: 3rem;
-                animation-name: fadeSlideUp;
-            }
-            .problem-grid { grid-template-columns: 1fr; }
             .benefits-grid { grid-template-columns: 1fr; }
             .arch-row { flex-direction: column; }
-        }
-
-        @media (min-width: 901px) {
-            .hero .container { position: relative; }
+            .bubble-you { align-self: flex-start; text-align: left; }
         }
     </style>
 </head>
 <body>
 
+<!-- ═══ HERO ═══ -->
 <section class="hero">
     <div class="container">
-        <div class="hero-badge"><span class="hero-badge-dot"></span> Claude Code Hook Server</div>
+        <div class="hero-badge"><span class="hero-badge-dot"></span> A Claude Code intervention</div>
         <h1><em>you what know</em></h1>
+        <p class="hero-tagline">"Wait, are you reading that file again?"</p>
         <p class="hero-sub">
-            Claude reads <strong>src/main.rs</strong> for the 5th time this session.
-            You stare at the screen. <strong>"You what now?"</strong><br>
-            This tool intercepts those reads and says: <em>here's what's in the file. Do you really need it again?</em>
+            You know the look. Claude's halfway through a task and decides to read <strong>src/main.rs</strong> for the fifth time.
+            847 lines. Again. You stare at your token counter and whisper <strong>"you what now?"</strong>
+            <br><br>
+            This tool gently taps Claude on the shoulder and goes: <em>hey buddy, here's what's in that file. You sure you need the whole thing?</em>
         </p>
-        <a href="#setup" class="hero-cta">Get Started &#8594;</a>
+        <a href="#setup" class="hero-cta">Make it stop &#8594;</a>
+    </div>
+</section>
 
-        <div class="terminal-float">
-            <div class="terminal">
-                <div class="terminal-bar">
-                    <div class="terminal-dot r"></div>
-                    <div class="terminal-dot y"></div>
-                    <div class="terminal-dot g"></div>
-                    <span class="terminal-bar-title">claude session</span>
-                </div>
-                <div class="terminal-body" id="terminal-demo"></div>
+<!-- ═══ TERMINAL DEMO ═══ -->
+<div class="terminal-section">
+    <div class="container">
+        <p class="terminal-label">A typical Tuesday with Claude (dramatized only slightly)</p>
+        <div class="terminal">
+            <div class="terminal-bar">
+                <div class="terminal-dot r"></div>
+                <div class="terminal-dot y"></div>
+                <div class="terminal-dot g"></div>
+                <span class="terminal-bar-title">claude &mdash; very busy reading the same file</span>
+            </div>
+            <div class="terminal-body" id="terminal-demo"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ THE PROBLEM ═══ -->
+<section class="reveal">
+    <div class="container">
+        <div class="section-label">The problem, illustrated</div>
+        <h2>We need to talk about Claude's reading habits.</h2>
+        <p class="muted">
+            We love Claude. Claude is great. But Claude has a problem. It reads files like someone
+            who opens the fridge every 10 minutes hoping new food appeared.
+            It didn't. It's the same fridge. Same food. Same 847 lines of main.rs.
+        </p>
+
+        <div class="convo">
+            <div class="bubble bubble-claude">
+                <div class="bubble-who">Claude</div>
+                Let me read src/main.rs to understand the project structure.
+            </div>
+            <div class="bubble bubble-claude">
+                <div class="bubble-who">Claude (30 seconds later)</div>
+                I should check src/main.rs to see how the server starts.
+            </div>
+            <div class="bubble bubble-you">
+                <div class="bubble-who">You</div>
+                you literally just read that
+            </div>
+            <div class="bubble bubble-claude">
+                <div class="bubble-who">Claude (2 minutes later)</div>
+                Let me look at src/main.rs to verify the import paths.
+            </div>
+            <div class="bubble bubble-you">
+                <div class="bubble-who">You</div>
+                YOU WHAT NOW
+            </div>
+            <div class="bubble bubble-ywk">
+                <div class="bubble-who">youwhatknow</div>
+                Hey Claude &#8212; src/main.rs was already read 3x this session.<br>
+                Here's the summary: Entry point, server startup. Public: main().<br>
+                Do you still need the full file?
+            </div>
+            <div class="bubble bubble-claude">
+                <div class="bubble-who">Claude</div>
+                ...no, actually, I don't. Thanks.
             </div>
         </div>
     </div>
 </section>
 
+<!-- ═══ HOW IT WORKS ═══ -->
 <section class="reveal">
     <div class="container">
-        <div class="section-label">The Problem</div>
-        <h2>Claude has a reading problem.</h2>
+        <div class="section-label">How it works</div>
+        <h2>A polite but firm intervention.</h2>
         <p class="muted">
-            Every exploration task starts with an avalanche of file reads. Large files get pulled in whole.
-            The same file gets read 3, 4, 5 times in a single session. Each read eats context tokens
-            that could be used for actual thinking.
-        </p>
-
-        <div class="problem-grid">
-            <div class="problem-card">
-                <span class="problem-stat" id="counter">0</span>
-                <h3>Wasted Reads</h3>
-                <p>Average redundant file reads in a complex coding session. Each one consumes tokens for content Claude already saw.</p>
-            </div>
-            <div class="problem-card">
-                <span class="problem-stat">40%</span>
-                <h3>Context Bloat</h3>
-                <p>Estimated context window consumed by re-reading files that were already loaded earlier in the session.</p>
-            </div>
-            <div class="problem-card">
-                <span class="problem-stat">100KB</span>
-                <h3>Blind Reads</h3>
-                <p>Claude reads entire files without knowing what's inside. A 2000-line file gets loaded just to check one function signature.</p>
-            </div>
-            <div class="problem-card">
-                <span class="problem-stat">&#8734;</span>
-                <h3>No Memory</h3>
-                <p>Each read has zero awareness of prior reads. No built-in "hey, you already read this" mechanism exists.</p>
-            </div>
-        </div>
-    </div>
-</section>
-
-<section class="reveal">
-    <div class="container">
-        <div class="section-label">How It Works</div>
-        <h2>A quiet interceptor.</h2>
-        <p class="muted">
-            youwhatknow runs as a system-wide daemon and hooks into Claude Code's tool lifecycle.
-            Before every file read, it injects a compact summary. Claude can then decide
-            if it actually needs the full file.
+            youwhatknow sits between Claude and the filesystem like a responsible friend at a buffet.
+            "You can have more if you want, but here's what's on your plate already."
         </p>
 
         <div class="flow">
             <div class="flow-step">
                 <div class="flow-num">1</div>
                 <div>
-                    <h3>Claude triggers a Read</h3>
-                    <p>Claude Code fires a <strong>PreToolUse</strong> hook before executing the Read tool.
-                    The hook sends the file path and session ID to youwhatknow via HTTP.</p>
+                    <h3>Claude reaches for a file</h3>
+                    <p>Claude Code fires a <strong>PreToolUse</strong> hook before every Read.
+                    youwhatknow gets the file path and session ID via HTTP before the read happens.</p>
                     <code>POST /hook/pre-read</code>
                 </div>
             </div>
             <div class="flow-step">
                 <div class="flow-num">2</div>
                 <div>
-                    <h3>Summary injected</h3>
-                    <p>youwhatknow looks up the file in its index and returns a 3-line summary:
-                    description, public symbols, and folder context. This gets injected into
-                    Claude's context <em>before</em> the read happens.</p>
-                    <code>additionalContext: "Public: Config, load(), default()"</code>
+                    <h3>A 3-line summary appears</h3>
+                    <p>Instead of 2000 lines of code, Claude sees: file description, public symbols,
+                    and folder context. Three lines. That's usually enough.</p>
+                    <code>"Entry point, server startup. Public: main()"</code>
+                    <div class="flow-aside">Think of it as the back-cover blurb instead of reading the whole book.</div>
                 </div>
             </div>
             <div class="flow-step">
                 <div class="flow-num">3</div>
                 <div>
-                    <h3>Re-read warning</h3>
-                    <p>If Claude already read this file in the current session, youwhatknow
-                    flags it: <em>"This file was already read 3x. Do you still need the full file?"</em></p>
+                    <h3>Repeat offenders get called out</h3>
+                    <p>Second read? Gentle note. Third read? "This file was already read 3x this session.
+                    Summary below &#8212; do you <em>still</em> need the full file?"</p>
                     <code>read 3x this session</code>
+                    <div class="flow-aside">Tough love. But the kind that saves your token budget.</div>
                 </div>
             </div>
             <div class="flow-step">
                 <div class="flow-num">4</div>
                 <div>
-                    <h3>Project map on startup</h3>
-                    <p>On <strong>SessionStart</strong>, the full project structure is injected
-                    so Claude knows where everything is without exploring.</p>
+                    <h3>Day-one orientation</h3>
+                    <p>On <strong>SessionStart</strong>, Claude gets a full project map injected automatically.
+                    No more "let me explore the codebase" spirals. It already knows where everything is.</p>
                     <code>POST /hook/session-start</code>
+                    <div class="flow-aside">Like giving the new hire a map instead of letting them wander the building.</div>
                 </div>
             </div>
         </div>
     </div>
 </section>
 
+<!-- ═══ ARCHITECTURE ═══ -->
 <section class="reveal">
     <div class="container">
         <div class="section-label">Architecture</div>
-        <h2>One daemon, all projects.</h2>
+        <h2>One daemon to rule them all.</h2>
         <p class="muted" style="margin-bottom: 1rem;">
-            A single system-wide process serves every Claude Code instance across all your projects.
-            Indexes are loaded lazily per-project on first request.
+            A single process serves every Claude Code session across all your projects.
+            Spin up 5 terminals with 5 projects? Same daemon. Subagents? Same daemon.
+            It figures out which project you're in from the <strong>cwd</strong> in each request.
         </p>
 
         <div class="arch-diagram">
@@ -644,9 +686,9 @@
             </div>
             <div class="arch-arrow-down">&#8595; HTTP hooks &#8595;</div>
             <div class="arch-row">
-                <div class="arch-box primary">youwhatknow daemon &#8212; localhost:7849</div>
+                <div class="arch-box primary">youwhatknow &#8212; localhost:7849</div>
             </div>
-            <div class="arch-arrow-down">&#8595; per-project routing via cwd &#8595;</div>
+            <div class="arch-arrow-down">&#8595; routes by cwd &#8595;</div>
             <div class="arch-row">
                 <div class="arch-box">Project A Index</div>
                 <div class="arch-box">Project B Index</div>
@@ -654,61 +696,63 @@
             </div>
             <div class="arch-arrow-down">&#8595;</div>
             <div class="arch-row">
-                <div class="arch-box" style="min-width: 260px;">tree-sitter symbols &#8226; haiku descriptions &#8226; TOML storage</div>
+                <div class="arch-box" style="min-width: 260px;">tree-sitter &#8226; haiku descriptions &#8226; TOML</div>
             </div>
         </div>
     </div>
 </section>
 
+<!-- ═══ BENEFITS ═══ -->
 <section class="reveal">
     <div class="container">
-        <div class="section-label">Benefits</div>
-        <h2>What you actually get.</h2>
+        <div class="section-label">The good stuff</div>
+        <h2>What's in it for you.</h2>
 
         <div class="benefits-grid">
             <div class="benefit">
                 <span class="benefit-icon" style="color: var(--glow);">&lt;/&gt;</span>
-                <h3>Smaller Context</h3>
-                <p>Summaries are 3 lines instead of 2000. Claude gets what it needs without filling the window.</p>
+                <h3>Context on a diet</h3>
+                <p>3 lines instead of 2000. Claude gets the gist without the bloat. More room for actual thinking.</p>
             </div>
             <div class="benefit">
                 <span class="benefit-icon" style="color: var(--amber);">&#8634;</span>
-                <h3>Re-read Awareness</h3>
-                <p>Per-session tracking warns Claude when it's reading a file again. Breaks the compulsive loop.</p>
+                <h3>"You already read that"</h3>
+                <p>Per-session tracking breaks the compulsive re-read loop. A gentle nudge before Claude goes for round 5.</p>
             </div>
             <div class="benefit">
                 <span class="benefit-icon" style="color: var(--red);">&#8709;</span>
-                <h3>Zero Config</h3>
-                <p>One HTTP hook in settings.json. The daemon handles everything: indexing, session tracking, multi-project routing.</p>
+                <h3>Stupid simple setup</h3>
+                <p>Paste a hook config. Start the daemon. That's it. No per-project ceremony. No YAML nightmares.</p>
             </div>
             <div class="benefit">
                 <span class="benefit-icon" style="color: var(--glow);">&#9638;</span>
-                <h3>Multi-Project</h3>
-                <p>Single daemon serves all projects. Indexes loaded lazily on first request. No per-project setup.</p>
+                <h3>All projects, one process</h3>
+                <p>The daemon loads project indexes lazily. First request for a new project? Indexed in the background. Zero waiting.</p>
             </div>
             <div class="benefit">
                 <span class="benefit-icon" style="color: var(--amber);">&#8635;</span>
-                <h3>Incremental Index</h3>
-                <p>Only re-indexes files that changed since last run. Uses git diff for fast change detection.</p>
+                <h3>Keeps itself fresh</h3>
+                <p>Incremental re-indexing via git diff. Only changed files get re-processed. Fast and quiet.</p>
             </div>
             <div class="benefit">
                 <span class="benefit-icon" style="color: var(--red);">&#10005;</span>
-                <h3>Non-Blocking</h3>
-                <p>If the daemon isn't running, Claude works normally. HTTP hooks fail silently. No disruption, ever.</p>
+                <h3>Invisible when off</h3>
+                <p>Daemon not running? Claude works normally. HTTP hooks fail silently. It's there when you want it, gone when you don't.</p>
             </div>
         </div>
     </div>
 </section>
 
+<!-- ═══ SETUP ═══ -->
 <section class="reveal" id="setup">
     <div class="container">
-        <div class="section-label">Get Started</div>
-        <h2>Two steps. Done.</h2>
+        <div class="section-label">Get started</div>
+        <h2>Two steps. Seriously.</h2>
 
         <div class="setup-block">
             <div class="setup-header">
                 <span>~/.claude/settings.json</span>
-                <span class="setup-tag">step 1: hook config</span>
+                <span class="setup-tag">step 1: tell claude about youwhatknow</span>
             </div>
             <div class="setup-code">{
   <span class="k">"hooks"</span>: {
@@ -733,24 +777,25 @@
         <div class="setup-block" style="margin-top: 1.5rem;">
             <div class="setup-header">
                 <span>terminal</span>
-                <span class="setup-tag">step 2: start the daemon</span>
+                <span class="setup-tag">step 2: let it rip</span>
             </div>
-            <div class="setup-code"><span class="c"># Install and run (or add to your shell profile / nix flake)</span>
+            <div class="setup-code"><span class="c"># Start the daemon. It indexes your projects lazily.</span>
 <span class="s">$</span> youwhatknow
 
-<span class="c"># That's it. Indexes projects lazily on first hook request.</span>
-<span class="c"># Auto-shuts down after 30 min idle. Restarts on next Claude session.</span></div>
+<span class="c"># It shuts itself down after 30 min of no action.</span>
+<span class="c"># Next time Claude starts a session, the shell hook brings it back.</span>
+<span class="c"># Very chill. Very low maintenance. Like a good houseplant.</span></div>
         </div>
 
         <div class="setup-block" style="margin-top: 1.5rem;">
             <div class="setup-header">
                 <span>~/.config/youwhatknow/config.toml</span>
-                <span class="setup-tag">optional</span>
+                <span class="setup-tag">optional &#8212; for the tinkerers</span>
             </div>
-            <div class="setup-code"><span class="c"># All settings have sensible defaults</span>
-<span class="k">port</span> = <span class="s">7849</span>
-<span class="k">session_timeout_minutes</span> = <span class="s">60</span>
-<span class="k">idle_shutdown_minutes</span> = <span class="s">30</span></div>
+            <div class="setup-code"><span class="c"># All settings have sensible defaults. You probably don't need this file.</span>
+<span class="k">port</span> = <span class="s">7849</span>                  <span class="c"># daemon port</span>
+<span class="k">session_timeout_minutes</span> = <span class="s">60</span>   <span class="c"># stale session cleanup</span>
+<span class="k">idle_shutdown_minutes</span> = <span class="s">30</span>     <span class="c"># auto-shutdown when bored</span></div>
         </div>
     </div>
 </section>
@@ -758,7 +803,8 @@
 <footer>
     <div class="container">
         <div class="footer-logo">youwhatknow</div>
-        <p>Built with Rust, Tokio, Axum, and tree-sitter. Because Claude deserves better reading habits.</p>
+        <p>Built with Rust, Tokio, Axum, and tree-sitter.</p>
+        <p class="footer-quip">"No Claude was harmed in the making of this tool. Just mildly inconvenienced."</p>
     </div>
 </footer>
 
@@ -766,21 +812,21 @@
 (function() {
     var lines = [
         { type: 'cmd', prompt: 'claude', cmd: 'Read', file: 'src/main.rs' },
-        { type: 'msg', text: '  Reading 847 lines...', cls: 't-dim' },
+        { type: 'msg', text: '  847 lines loaded. Cool, cool.', cls: 't-dim' },
         { type: 'cmd', prompt: 'claude', cmd: 'Read', file: 'src/config.rs' },
-        { type: 'msg', text: '  Reading 412 lines...', cls: 't-dim' },
+        { type: 'msg', text: '  412 lines. Sure.', cls: 't-dim' },
         { type: 'cmd', prompt: 'claude', cmd: 'Read', file: 'src/main.rs' },
-        { type: 'msg', text: '  Reading 847 lines... (again)', cls: 't-warn' },
+        { type: 'msg', text: '  847 lines. Wait, again?', cls: 't-warn' },
         { type: 'cmd', prompt: 'claude', cmd: 'Read', file: 'src/server.rs' },
-        { type: 'msg', text: '  Reading 623 lines...', cls: 't-dim' },
+        { type: 'msg', text: '  623 lines. At least this one is new.', cls: 't-dim' },
         { type: 'cmd', prompt: 'claude', cmd: 'Read', file: 'src/main.rs' },
-        { type: 'msg', text: '  Reading 847 lines... (3rd time)', cls: 't-warn' },
+        { type: 'msg', text: '  847 lines. Third time. Really?', cls: 't-warn' },
         { type: 'msg', text: '', cls: 't-dim' },
-        { type: 'msg', text: '  youwhatknow:', cls: 't-ok t-bold' },
-        { type: 'msg', text: '  -- src/main.rs (read 3x) --', cls: 't-ok' },
+        { type: 'msg', text: '  youwhatknow: hey, buddy.', cls: 't-ok t-bold' },
+        { type: 'msg', text: '  -- src/main.rs (read 3x this session) --', cls: 't-ok' },
         { type: 'msg', text: '  Entry point, server startup', cls: 't-ok' },
         { type: 'msg', text: '  Public: main()', cls: 't-ok' },
-        { type: 'msg', text: '  Do you still need the full file?', cls: 't-warn' },
+        { type: 'msg', text: '  You sure you need all 847 lines again?', cls: 't-warn' },
     ];
 
     var terminal = document.getElementById('terminal-demo');
@@ -827,30 +873,16 @@
         terminal.appendChild(el);
         lineIndex++;
 
-        var delay = line.text === '' ? 400 : (lineIndex > 10 ? 120 : 250);
+        var delay = line.text === '' ? 500 : (lineIndex > 10 ? 150 : 300);
         setTimeout(addLine, delay);
     }
 
-    setTimeout(addLine, 1500);
-
-    function animateCounter() {
-        var counter = document.getElementById('counter');
-        var target = 23;
-        var current = 0;
-        var interval = setInterval(function() {
-            current++;
-            counter.textContent = current;
-            if (current >= target) clearInterval(interval);
-        }, 60);
-    }
+    setTimeout(addLine, 1000);
 
     var observer = new IntersectionObserver(function(entries) {
         entries.forEach(function(entry) {
             if (entry.isIntersecting) {
                 entry.target.classList.add('visible');
-                if (entry.target.querySelector('#counter')) {
-                    animateCounter();
-                }
             }
         });
     }, { threshold: 0.15 });
