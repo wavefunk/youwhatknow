@@ -57,7 +57,7 @@
               baseName == "build.rs" ||
               pkgs.lib.hasSuffix ".rs" baseName;
           };
-          cargoHash = "sha256-ugGZbHuU7ZQ15U+wS5ACzbs7j0ipyKOiTFPl1I1GKUI=";
+          cargoHash = "sha256-BOovGtXjqJ2ZEI1IQeF6SE/ZB5QNs8/br46mrpM/RqI=";
 
           nativeBuildInputs = with pkgs; [
             pkg-config
@@ -73,29 +73,6 @@
               --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.claude-code ]}
           '';
         };
-
-        # Shell hook that ensures the system-wide youwhatknow daemon is running.
-        # The daemon serves all projects, auto-shuts down after idle timeout.
-        # PID file at ~/.local/share/youwhatknow/youwhatknow.pid
-        youwhatknowHook = ''
-          if command -v claude &>/dev/null && command -v youwhatknow &>/dev/null; then
-            _ywk_pidfile="$HOME/.local/share/youwhatknow/youwhatknow.pid"
-
-            _ywk_running=false
-            if [ -f "$_ywk_pidfile" ]; then
-              _ywk_pid=$(cat "$_ywk_pidfile" 2>/dev/null)
-              if [ -n "$_ywk_pid" ] && kill -0 "$_ywk_pid" 2>/dev/null; then
-                _ywk_running=true
-              fi
-            fi
-
-            if [ "$_ywk_running" = false ]; then
-              echo "Starting youwhatknow daemon..."
-              youwhatknow &>/dev/null &
-              disown
-            fi
-          fi
-        '';
       in
       {
         packages = {
@@ -115,7 +92,6 @@
               dolt
               beads-latest
               cargo-dist
-              youwhatknow
             ];
 
             buildInputs = [
@@ -123,8 +99,6 @@
               pkg-config
               toolchain
             ];
-
-            shellHook = youwhatknowHook;
           };
       }
     );

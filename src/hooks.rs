@@ -47,21 +47,22 @@ pub async fn handle_pre_read(
 
 /// Handle a SessionStart hook.
 pub async fn handle_session_start(index: &Index) -> HookResponse {
-    if !index.is_ready() && index.indexed_count() == 0 {
-        let context =
-            "-- youwhatknow: indexing in progress --\nProject summaries are being generated."
-                .to_owned();
-        return HookResponse::session_start_context(context);
-    }
-
     let map = index.project_map().await;
+
     if map.is_empty() {
-        return HookResponse::session_start_context(
-            "-- youwhatknow: no summaries available --".to_owned(),
-        );
+        let context = if !index.is_ready() {
+            "-- youwhatknow: indexing in progress --\nProject summaries are being generated."
+        } else {
+            "-- youwhatknow: no summaries available --"
+        };
+        return HookResponse::session_start_context(context.to_owned());
     }
 
-    let context = format!("-- youwhatknow: project map --\n{map}");
+    let mut context = String::from("-- youwhatknow: project map --\n");
+    context.push_str(&map);
+    if !index.is_ready() {
+        context.push_str("\n(indexing in progress — some summaries may be stale)");
+    }
     HookResponse::session_start_context(context)
 }
 

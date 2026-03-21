@@ -164,6 +164,7 @@ impl Index {
         self.inner.ready.load(Ordering::Relaxed)
     }
 
+    #[allow(dead_code)]
     pub fn indexed_count(&self) -> usize {
         self.inner.indexed_count.load(Ordering::Relaxed)
     }
