@@ -54,13 +54,30 @@
 
         # Shell hook script that starts youwhatknow in the background
         # if claude is on PATH and the server isn't already running.
+        # The server auto-shuts down after idle_shutdown_minutes of inactivity,
+        # handling the direnv unload case. PID file + EXIT trap handle shell exit.
         youwhatknowHook = ''
           if command -v claude &>/dev/null && command -v youwhatknow &>/dev/null; then
-            if ! curl -s http://localhost:7849/health &>/dev/null; then
-              echo "Starting youwhatknow hook server..."
-              youwhatknow &>/dev/null &
-              disown
+            _ywk_pidfile="$PWD/.claude/summaries/youwhatknow.pid"
+
+            # Kill stale instance if PID file exists but process is dead
+            if [ -f "$_ywk_pidfile" ]; then
+              _ywk_old_pid=$(cat "$_ywk_pidfile" 2>/dev/null)
+              if [ -n "$_ywk_old_pid" ] && kill -0 "$_ywk_old_pid" 2>/dev/null; then
+                # Already running, nothing to do
+                return 0 2>/dev/null || true
+              else
+                rm -f "$_ywk_pidfile"
+              fi
             fi
+
+            echo "Starting youwhatknow hook server..."
+            youwhatknow &>/dev/null &
+            _ywk_pid=$!
+            disown
+
+            # Clean up on shell exit (handles terminal close)
+            trap "kill $_ywk_pid 2>/dev/null; rm -f '$_ywk_pidfile'" EXIT
           fi
         '';
       in
