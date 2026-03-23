@@ -641,6 +641,16 @@
             <div class="flow-step">
                 <div class="flow-num">2</div>
                 <div>
+                    <h3>Small files get a free pass</h3>
+                    <p>Files under <strong>30 lines</strong> are waved through without intervention. They're small enough to just read.
+                    Only files over the threshold get the summary-first treatment.</p>
+                    <code>line_threshold = 30</code>
+                    <div class="flow-aside">Configurable per project. No point summarizing a 12-line config file.</div>
+                </div>
+            </div>
+            <div class="flow-step">
+                <div class="flow-num">3</div>
+                <div>
                     <h3>A 3-line summary appears</h3>
                     <p>Instead of 2000 lines of code, Claude sees: file description, public symbols,
                     and folder context. Three lines. That's usually enough.</p>
@@ -649,7 +659,7 @@
                 </div>
             </div>
             <div class="flow-step">
-                <div class="flow-num">3</div>
+                <div class="flow-num">4</div>
                 <div>
                     <h3>Repeat offenders get called out</h3>
                     <p>Second read? Gentle note. Third read? "This file was already read 3x this session.
@@ -659,7 +669,7 @@
                 </div>
             </div>
             <div class="flow-step">
-                <div class="flow-num">4</div>
+                <div class="flow-num">5</div>
                 <div>
                     <h3>Day-one orientation</h3>
                     <p>On <strong>SessionStart</strong>, Claude gets a full project map injected automatically.
@@ -727,7 +737,7 @@
             <div class="benefit">
                 <span class="benefit-icon" style="color: var(--red);">&#8709;</span>
                 <h3>Stupid simple setup</h3>
-                <p>Paste a hook config. Start the daemon. That's it. No per-project ceremony. No YAML nightmares.</p>
+                <p>One command: <code style="color: var(--glow); font-size: 11px;">youwhatknow setup</code>. Hooks, daemon, indexing &#8212; all handled. No YAML nightmares.</p>
             </div>
             <div class="benefit">
                 <span class="benefit-icon" style="color: var(--glow);">&#9638;</span>
@@ -752,14 +762,51 @@
 <section class="reveal" id="setup">
     <div class="container">
         <div class="section-label">Get started</div>
-        <h2>Two steps. Seriously.</h2>
+        <h2>One command. Seriously.</h2>
 
         <div class="setup-block">
             <div class="setup-header">
-                <span>~/.claude/settings.json</span>
-                <span class="setup-tag">step 1: tell claude about youwhatknow</span>
+                <span>terminal</span>
+                <span class="setup-tag">the whole thing</span>
             </div>
-            <div class="setup-code">{
+            <div class="setup-code"><span class="s">$</span> cd your-project
+<span class="s">$</span> youwhatknow setup
+
+<span class="c"># Creates .claude/ and .claude/summaries/</span>
+<span class="c"># Merges hook config into .claude/settings.local.json</span>
+<span class="c"># Starts the daemon if not already running</span>
+<span class="c"># Triggers initial project indexing</span>
+<span class="c"># That's genuinely it.</span></div>
+        </div>
+
+        <div class="setup-block" style="margin-top: 1.5rem;">
+            <div class="setup-header">
+                <span>terminal</span>
+                <span class="setup-tag">variants</span>
+            </div>
+            <div class="setup-code"><span class="s">$</span> youwhatknow setup --shared    <span class="c"># writes to .claude/settings.json (team-shared)</span>
+<span class="s">$</span> youwhatknow setup --no-index  <span class="c"># skip initial indexing</span>
+
+<span class="c"># Existing hooks in your settings file are preserved &#8212; it merges, not overwrites.</span></div>
+        </div>
+
+        <div class="setup-block" style="margin-top: 1.5rem;">
+            <div class="setup-header">
+                <span>terminal</span>
+                <span class="setup-tag">other useful commands</span>
+            </div>
+            <div class="setup-code"><span class="s">$</span> youwhatknow status            <span class="c"># daemon uptime, active sessions, registered projects</span>
+<span class="s">$</span> youwhatknow summary src/main.rs <span class="c"># preview a file's summary (no read count triggered)</span></div>
+        </div>
+
+        <details style="margin-top: 2rem; color: var(--text-dim); font-size: 13px;">
+            <summary style="cursor: pointer; color: var(--text); margin-bottom: 1rem;">Manual hook setup (the old way)</summary>
+            <div class="setup-block">
+                <div class="setup-header">
+                    <span>~/.claude/settings.json</span>
+                    <span class="setup-tag">manual</span>
+                </div>
+                <div class="setup-code">{
   <span class="k">"hooks"</span>: {
     <span class="k">"PreToolUse"</span>: [{
       <span class="k">"matcher"</span>: <span class="s">"Read"</span>,
@@ -776,21 +823,12 @@
       }]
     }]
   }
-}</div>
-        </div>
+}
 
-        <div class="setup-block" style="margin-top: 1.5rem;">
-            <div class="setup-header">
-                <span>terminal</span>
-                <span class="setup-tag">step 2: let it rip</span>
+<span class="c">Then start the daemon:</span>
+<span class="s">$</span> youwhatknow</div>
             </div>
-            <div class="setup-code"><span class="c"># Start the daemon. It indexes your projects lazily.</span>
-<span class="s">$</span> youwhatknow
-
-<span class="c"># It shuts itself down after 30 min of no action.</span>
-<span class="c"># Next time Claude starts a session, the shell hook brings it back.</span>
-<span class="c"># Very chill. Very low maintenance. Like a good houseplant.</span></div>
-        </div>
+        </details>
 
         <div class="setup-block" style="margin-top: 1.5rem;">
             <div class="setup-header">
