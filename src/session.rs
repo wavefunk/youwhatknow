@@ -60,6 +60,11 @@ impl SessionTracker {
         }
     }
 
+    /// Number of tracked sessions (not yet cleaned up).
+    pub async fn session_count(&self) -> usize {
+        self.inner.read().await.last_activity.len()
+    }
+
     /// Get the current read count without incrementing.
     #[cfg(test)]
     pub async fn read_count(&self, session_id: &str, file_path: &Path) -> u32 {
@@ -179,6 +184,22 @@ mod tests {
 
         let count = tracker.track_read("s1", &path).await;
         assert_eq!(count, 2);
+    }
+
+    #[tokio::test]
+    async fn session_count_reflects_active_sessions() {
+        let tracker = SessionTracker::new();
+        assert_eq!(tracker.session_count().await, 0);
+
+        tracker.track_read("session-1", Path::new("/a.rs")).await;
+        assert_eq!(tracker.session_count().await, 1);
+
+        tracker.track_read("session-2", Path::new("/b.rs")).await;
+        assert_eq!(tracker.session_count().await, 2);
+
+        // Same session, different file — still 2
+        tracker.track_read("session-1", Path::new("/c.rs")).await;
+        assert_eq!(tracker.session_count().await, 2);
     }
 
     #[tokio::test]
