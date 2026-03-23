@@ -193,7 +193,9 @@ fn is_youwhatknow_group(group: &serde_json::Value) -> bool {
     hooks.iter().any(|hook| {
         let cmd = hook.get("command").and_then(|v| v.as_str()).unwrap_or("");
         let url = hook.get("url").and_then(|v| v.as_str()).unwrap_or("");
-        cmd.contains("youwhatknow") || url.contains("youwhatknow") || url.contains("/hook/pre-read")
+        cmd.contains("youwhatknow")
+            || url.contains("youwhatknow")
+            || (url.contains("localhost") && url.contains("/hook/pre-read"))
     })
 }
 
