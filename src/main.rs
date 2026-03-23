@@ -7,6 +7,7 @@ mod registry;
 mod session;
 mod server;
 mod storage;
+mod summary;
 mod types;
 
 use clap::{Parser, Subcommand};
