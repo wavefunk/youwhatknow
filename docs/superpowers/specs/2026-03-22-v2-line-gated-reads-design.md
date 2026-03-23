@@ -63,10 +63,12 @@ Replaces the current separate `extract_symbols` call. One parse, two extractions
 ```rust
 struct ToolInput {
     file_path: PathBuf,
-    offset: Option<u32>,  // NEW
-    limit: Option<u32>,   // NEW
+    offset: Option<u32>,  // NEW — Claude Code sends as "offset" (snake_case)
+    limit: Option<u32>,   // NEW — Claude Code sends as "limit" (snake_case)
 }
 ```
+
+Note: Claude Code sends Read tool input with `file_path` as camelCase (`filePath`) but `offset` and `limit` as lowercase. The existing `#[serde(alias = "filePath")]` pattern applies to `file_path`; the new fields need no alias since they're already snake_case in the wire format.
 
 ### `ProjectConfig` (modified)
 
@@ -83,18 +85,21 @@ struct ProjectConfig {
 
 ```
 handle_pre_read(index, session, project_root, config, request):
-  1. File outside project              → allow, no context
-  2. No summary available              → allow, no context
-  3. Has offset or limit in tool_input → allow, no context (targeted read)
-  4. File line_count ≤ line_threshold  → allow, no context
-  5. Read count == 0 (first encounter) → deny + rendered summary with line-range map
-  6. Read count == 1 (second)          → allow, clean pass
-  7. Read count ≥ 2 (third+)          → allow + additionalContext with read count nudge
+  1. File outside project              → allow, no context (no count tracking)
+  2. No summary available              → allow, no context (no count tracking)
+  3. Has offset or limit in tool_input → allow, no context (no count tracking)
+  4. File line_count ≤ line_threshold  → allow, no context (no count tracking)
+  -- steps 1-4 are early exits, no call to track_read --
+  5. track_read() → count == 1 (first) → deny + rendered summary with line-range map
+  6. count == 2 (second)               → allow, clean pass
+  7. count ≥ 3 (third+)               → allow + additionalContext with read count nudge
 ```
 
+Note: `session.track_read()` returns the post-increment count (first call returns 1, not 0). Steps 1-4 are checked before `track_read` is called — they don't increment the counter. Targeted reads (offset/limit) never touch the counter.
+
 Key behaviors:
-- Targeted reads (offset/limit present) always pass through — Claude already knows what section it wants.
-- Files under the threshold always pass through — no interference for small files.
+- Targeted reads (offset/limit present) always pass through — Claude already knows what section it wants. No count increment.
+- Files under the threshold always pass through — no interference for small files. No count increment.
 - Second read is clean — Claude has the full file, doesn't need the line-range map attached.
 - Third+ read gets a nudge via `additionalContext` — "this file has been read N times this session."
 
@@ -152,13 +157,15 @@ youwhatknow summary <path>
 - Takes a file path relative to cwd
 - Reads `$YOUWHATKNOW_SESSION` from env for session attribution
 - Sends `POST /hook/summary` to daemon with `{ session_id, cwd, file_path }`
-- Daemon renders the summary, increments read count to 1 (if session provided), returns rendered text
+- Daemon renders the summary, sets read count to 1 if currently 0 (conditional — does not increment if already tracked), returns rendered text
 - CLI prints text to stdout
 - Auto-starts daemon if not running (same as `init`)
 
 ### Modified subcommand: `init`
 
 Added step: before proxying to daemon, parse `session_id` from stdin payload and write `YOUWHATKNOW_SESSION=<session_id>` to `$CLAUDE_ENV_FILE` (if that env var is present).
+
+`CLAUDE_ENV_FILE` is exclusive to SessionStart hooks. Claude Code reads it after the hook completes and sets the env vars for all subsequent Bash commands in the session. Since SessionStart fires before any tool calls, `$YOUWHATKNOW_SESSION` is available to all subsequent `youwhatknow summary` CLI invocations. Note: the PreToolUse hook does not need this env var — it receives `session_id` directly in the hook request payload.
 
 ## New Daemon Endpoint
 
@@ -174,9 +181,11 @@ Request body:
 }
 ```
 
+`file_path` is relative to `cwd`. The daemon resolves `cwd` to the project root via the registry (same worktree resolution as other endpoints), then looks up the file in the index using the relative path. This matches how the Read hook resolves paths via `strip_prefix(project_root)`.
+
 Response: plain text rendered summary.
 
-- If session_id is present: increment read count, return summary
+- If session_id is present: set read count to 1 if currently 0 (conditional), return summary
 - If session_id is absent: log warning, return summary without count tracking
 - If no summary available: return message suggesting reindex, exit 0
 
@@ -224,6 +233,14 @@ One tree-sitter parse, two extractions. `FileAnalysis` contains symbols, line ra
 | Consecutive `use` | Collapsed to `"Imports"` |
 
 For unsupported languages: `line_ranges` is empty. Summary still shows description + symbols.
+
+## Implementation Notes
+
+**`line_count` staleness:** The `line_count` stored in `FileSummary` is recorded at indexing time. If a file grows past the threshold between index runs, the hook will allow it through based on the stale count. This is the same acceptable tradeoff as the existing `max_file_size_kb` check — we do not stat or read files at hook time. The incremental indexer picks up changes on next session.
+
+**`SessionTracker` needs a conditional set:** The CLI `summary` endpoint requires a "set to 1 if currently 0" operation, not a blind increment. Add `track_summary` (or similar) to `SessionTracker` that only sets the count to 1 when the current count is 0. The existing `track_read` (unconditional increment) is used by the hook path.
+
+**`hooks.rs` update scope:** Both `handle_pre_read` (new gating logic) and `handle_session_start` (use `summary::render_project_map` + `render_session_instructions`) need updating. The old `format_summary` helper is replaced entirely by `summary.rs`.
 
 ## Warning & Error Behavior
 
