@@ -1,0 +1,11 @@
+summary_path = ".claude/summaries"
+line_threshold = 30
+
+ignored_patterns = [
+  ".beads/*",
+  "docs/*",
+  "*.toml",
+  "*.lock",
+  "*.json",
+  "*.md",
+]
