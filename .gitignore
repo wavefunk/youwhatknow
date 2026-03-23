@@ -10,3 +10,4 @@
 /.claude/manifest/
 /.claude/settings.local.json
 /.worktrees/
+flake.nix.bak
