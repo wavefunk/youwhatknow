@@ -51,7 +51,9 @@ pub async fn handle_pre_read(
     }
 
     // 5-7: track the read
-    let read_count = session.track_read(&request.session_id, file_path).await;
+    let read_count = session
+        .track_read(&request.session_id, file_path, config.eviction_threshold)
+        .await;
 
     if read_count == 1 {
         // First read: deny with summary + line-range map
