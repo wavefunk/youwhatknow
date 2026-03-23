@@ -6,6 +6,11 @@ use crate::storage;
 use crate::types::{HookRequest, HookResponse};
 
 /// Handle a PreToolUse hook for the Read tool.
+///
+/// Strategy:
+/// - No summary available → allow (nothing useful to provide)
+/// - First read with summary → deny with summary, instruct to read again if needed
+/// - Second+ read → allow with summary context (Claude insisted, let it through)
 pub async fn handle_pre_read(
     index: &Index,
     session: &SessionTracker,
@@ -18,21 +23,13 @@ pub async fn handle_pre_read(
 
     let file_path = &tool_input.file_path;
 
-    // Check if file is inside the project
+    // Files outside the project — allow without interference
     let rel_path = match file_path.strip_prefix(project_root) {
         Ok(rel) => rel,
         Err(_) => return HookResponse::allow_no_context("PreToolUse"),
     };
 
-    // Check if indexing is still in progress and file isn't indexed
-    if !index.is_ready() && index.lookup_file(rel_path).await.is_none() {
-        let context = "-- youwhatknow: indexing in progress --\n\
-            File summaries are still being generated. This read will proceed without a summary."
-            .to_owned();
-        return HookResponse::allow_with_context("PreToolUse", context);
-    }
-
-    // Look up file summary
+    // No summary available — allow the read
     let Some(file_summary) = index.lookup_file(rel_path).await else {
         return HookResponse::allow_no_context("PreToolUse");
     };
@@ -40,9 +37,21 @@ pub async fn handle_pre_read(
     // Track the read
     let read_count = session.track_read(&request.session_id, file_path).await;
 
-    // Format the response
-    let context = format_pre_read_context(rel_path, &file_summary, read_count, index).await;
-    HookResponse::allow_with_context("PreToolUse", context)
+    // Build summary context
+    let summary = format_summary(rel_path, &file_summary, index).await;
+
+    if read_count == 1 {
+        // First read: deny with summary, let Claude decide if it needs the full file
+        let reason = format!(
+            "{summary}\n\
+             If this summary is sufficient, do not read the file. \
+             If you need the full file contents, read it again."
+        );
+        HookResponse::deny_with_reason("PreToolUse", reason)
+    } else {
+        // Second+ read: Claude insisted, allow it through with summary as context
+        HookResponse::allow_with_context("PreToolUse", summary)
+    }
 }
 
 /// Handle a SessionStart hook.
@@ -66,38 +75,22 @@ pub async fn handle_session_start(index: &Index) -> HookResponse {
     HookResponse::session_start_context(context)
 }
 
-/// Format the context string for a pre-read response.
-async fn format_pre_read_context(
+/// Format a file summary string with description, symbols, and folder context.
+async fn format_summary(
     rel_path: &Path,
     file_summary: &crate::types::FileSummary,
-    read_count: u32,
     index: &Index,
 ) -> String {
     let path_display = rel_path.display();
-    let mut lines = Vec::new();
+    let mut lines = Vec::with_capacity(4);
 
-    // Header with optional read count
-    if read_count > 1 {
-        lines.push(format!(
-            "-- youwhatknow: {path_display} (read {read_count}x this session) --"
-        ));
-        lines.push(
-            "This file was already read. Summary below — do you still need the full file?"
-                .to_owned(),
-        );
-    } else {
-        lines.push(format!("-- youwhatknow: {path_display} --"));
-    }
-
-    // Description
+    lines.push(format!("-- youwhatknow: {path_display} --"));
     lines.push(file_summary.description.clone());
 
-    // Symbols
     if !file_summary.symbols.is_empty() {
         lines.push(format!("Public: {}", file_summary.symbols.join(", ")));
     }
 
-    // Folder context
     if let Some(folder) = index.lookup_folder(rel_path).await {
         let folder_path = rel_path
             .parent()
@@ -131,6 +124,8 @@ mod tests {
                 path: rel,
                 description: "Entry point for the application".to_owned(),
                 symbols: vec!["main()".to_owned()],
+                line_count: 0,
+                line_ranges: vec![],
                 summarized: Utc::now(),
             })
             .await;
@@ -151,7 +146,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn pre_read_first_read() {
+    async fn pre_read_first_read_denies_with_summary() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let root = tmp.path();
         let index = setup_index(root).await;
@@ -164,24 +159,33 @@ mod tests {
             tool_name: Some("Read".to_owned()),
             tool_input: Some(ToolInput {
                 file_path: root.join("src/main.rs"),
+                offset: None,
+                limit: None,
             }),
         };
 
         let resp = handle_pre_read(&index, &session, root, &request).await;
-        let ctx = resp
-            .hook_specific_output
-            .additional_context
-            .expect("should have context");
 
-        assert!(ctx.contains("-- youwhatknow: src/main.rs --"));
-        assert!(ctx.contains("Entry point for the application"));
-        assert!(ctx.contains("Public: main()"));
-        assert!(ctx.contains("Folder: src/ — Core logic"));
-        assert!(!ctx.contains("already read"));
+        // First read should be denied
+        assert_eq!(
+            resp.hook_specific_output.permission_decision.as_deref(),
+            Some("deny")
+        );
+
+        // Reason should contain the summary
+        let reason = resp
+            .hook_specific_output
+            .permission_decision_reason
+            .expect("should have reason");
+        assert!(reason.contains("-- youwhatknow: src/main.rs --"));
+        assert!(reason.contains("Entry point for the application"));
+        assert!(reason.contains("Public: main()"));
+        assert!(reason.contains("Folder: src/ — Core logic"));
+        assert!(reason.contains("read it again"));
     }
 
     #[tokio::test]
-    async fn pre_read_re_read_warns() {
+    async fn pre_read_second_read_allows() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let root = tmp.path();
         let index = setup_index(root).await;
@@ -194,20 +198,29 @@ mod tests {
             tool_name: Some("Read".to_owned()),
             tool_input: Some(ToolInput {
                 file_path: root.join("src/main.rs"),
+                offset: None,
+                limit: None,
             }),
         };
 
-        // First read
-        handle_pre_read(&index, &session, root, &request).await;
-        // Second read
+        // First read — denied
         let resp = handle_pre_read(&index, &session, root, &request).await;
+        assert_eq!(
+            resp.hook_specific_output.permission_decision.as_deref(),
+            Some("deny")
+        );
+
+        // Second read — allowed with summary context
+        let resp = handle_pre_read(&index, &session, root, &request).await;
+        assert_eq!(
+            resp.hook_specific_output.permission_decision.as_deref(),
+            Some("allow")
+        );
         let ctx = resp
             .hook_specific_output
             .additional_context
             .expect("should have context");
-
-        assert!(ctx.contains("read 2x this session"));
-        assert!(ctx.contains("already read"));
+        assert!(ctx.contains("Entry point for the application"));
     }
 
     #[tokio::test]
@@ -224,6 +237,8 @@ mod tests {
             tool_name: Some("Read".to_owned()),
             tool_input: Some(ToolInput {
                 file_path: PathBuf::from("/etc/hosts"),
+                offset: None,
+                limit: None,
             }),
         };
 
@@ -232,11 +247,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn pre_read_indexing_in_progress() {
+    async fn pre_read_no_summary_allows() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let root = tmp.path();
         let index = Index::new();
-        // NOT marking as ready
         let session = SessionTracker::new();
 
         let request = HookRequest {
@@ -246,15 +260,17 @@ mod tests {
             tool_name: Some("Read".to_owned()),
             tool_input: Some(ToolInput {
                 file_path: root.join("src/main.rs"),
+                offset: None,
+                limit: None,
             }),
         };
 
         let resp = handle_pre_read(&index, &session, root, &request).await;
-        let ctx = resp
-            .hook_specific_output
-            .additional_context
-            .expect("should have context");
-        assert!(ctx.contains("indexing in progress"));
+        assert_eq!(
+            resp.hook_specific_output.permission_decision.as_deref(),
+            Some("allow")
+        );
+        assert!(resp.hook_specific_output.additional_context.is_none());
     }
 
     #[tokio::test]

@@ -7,12 +7,31 @@ use serde::{Deserialize, Serialize};
 // ── Storage types (TOML on disk) ──
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct LineRange {
+    pub start: u32,
+    pub end: u32,
+    pub label: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FileSummary {
     pub path: PathBuf,
     pub description: String,
     #[serde(default)]
     pub symbols: Vec<String>,
+    #[serde(default)]
+    pub line_count: u32,
+    #[serde(default)]
+    pub line_ranges: Vec<LineRange>,
     pub summarized: DateTime<Utc>,
+}
+
+/// Result of analyzing a file with tree-sitter. Internal to the indexer.
+#[allow(dead_code)]
+pub struct FileAnalysis {
+    pub symbols: Vec<String>,
+    pub line_ranges: Vec<LineRange>,
+    pub line_count: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -57,6 +76,12 @@ pub struct HookRequest {
 pub struct ToolInput {
     #[serde(alias = "filePath")]
     pub file_path: PathBuf,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub offset: Option<u32>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub limit: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,6 +96,11 @@ pub struct HookSpecificOutput {
     pub hook_event_name: String,
     #[serde(rename = "permissionDecision", skip_serializing_if = "Option::is_none")]
     pub permission_decision: Option<String>,
+    #[serde(
+        rename = "permissionDecisionReason",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub permission_decision_reason: Option<String>,
     #[serde(rename = "additionalContext", skip_serializing_if = "Option::is_none")]
     pub additional_context: Option<String>,
 }
@@ -81,6 +111,7 @@ impl HookResponse {
             hook_specific_output: HookSpecificOutput {
                 hook_event_name: event_name.to_owned(),
                 permission_decision: Some("allow".to_owned()),
+                permission_decision_reason: None,
                 additional_context: Some(context),
             },
         }
@@ -91,6 +122,18 @@ impl HookResponse {
             hook_specific_output: HookSpecificOutput {
                 hook_event_name: event_name.to_owned(),
                 permission_decision: Some("allow".to_owned()),
+                permission_decision_reason: None,
+                additional_context: None,
+            },
+        }
+    }
+
+    pub fn deny_with_reason(event_name: &str, reason: String) -> Self {
+        Self {
+            hook_specific_output: HookSpecificOutput {
+                hook_event_name: event_name.to_owned(),
+                permission_decision: Some("deny".to_owned()),
+                permission_decision_reason: Some(reason),
                 additional_context: None,
             },
         }
@@ -101,6 +144,7 @@ impl HookResponse {
             hook_specific_output: HookSpecificOutput {
                 hook_event_name: "SessionStart".to_owned(),
                 permission_decision: None,
+                permission_decision_reason: None,
                 additional_context: Some(context),
             },
         }
@@ -128,6 +172,8 @@ mod tests {
                 path: PathBuf::from("src/main.rs"),
                 description: "Entry point".to_owned(),
                 symbols: vec!["main()".to_owned()],
+                line_count: 0,
+                line_ranges: vec![],
                 summarized: Utc::now(),
             },
         );
@@ -245,6 +291,87 @@ mod tests {
             "allow"
         );
         assert!(json["hookSpecificOutput"].get("additionalContext").is_none());
+    }
+
+    #[test]
+    fn line_range_display() {
+        let range = LineRange {
+            start: 1,
+            end: 67,
+            label: "ActivityTracker — idle timeout, touch/check".to_owned(),
+        };
+        assert_eq!(range.start, 1);
+        assert_eq!(range.end, 67);
+    }
+
+    #[test]
+    fn file_summary_with_line_ranges_toml_roundtrip() {
+        let mut files = HashMap::new();
+        files.insert(
+            "main".to_owned(),
+            FileSummary {
+                path: PathBuf::from("src/main.rs"),
+                description: "Entry point".to_owned(),
+                symbols: vec!["main()".to_owned()],
+                line_count: 52,
+                line_ranges: vec![
+                    LineRange {
+                        start: 1,
+                        end: 10,
+                        label: "Imports".to_owned(),
+                    },
+                    LineRange {
+                        start: 12,
+                        end: 52,
+                        label: "main() function".to_owned(),
+                    },
+                ],
+                summarized: Utc::now(),
+            },
+        );
+
+        let summary = FolderSummary {
+            generated: Utc::now(),
+            description: "Core logic".to_owned(),
+            files,
+        };
+
+        let toml_str = toml::to_string_pretty(&summary).expect("serialize");
+        let parsed: FolderSummary = toml::from_str(&toml_str).expect("deserialize");
+        assert_eq!(summary, parsed);
+    }
+
+    #[test]
+    fn file_summary_without_line_ranges_deserializes() {
+        let toml_str = r#"
+path = "src/main.rs"
+description = "Entry point"
+symbols = ["main()"]
+summarized = "2026-03-22T00:00:00Z"
+"#;
+        let parsed: FileSummary = toml::from_str(toml_str).expect("deserialize");
+        assert_eq!(parsed.line_count, 0);
+        assert!(parsed.line_ranges.is_empty());
+    }
+
+    #[test]
+    fn tool_input_deserializes_with_offset_limit() {
+        let json = r#"{
+            "file_path": "/home/user/project/src/main.rs",
+            "offset": 10,
+            "limit": 50
+        }"#;
+        let input: ToolInput = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(input.offset, Some(10));
+        assert_eq!(input.limit, Some(50));
+    }
+
+    #[test]
+    fn tool_input_deserializes_without_offset_limit() {
+        let json = r#"{"file_path": "/home/user/project/src/main.rs"}"#;
+        let input: ToolInput = serde_json::from_str(json).expect("deserialize");
+        assert!(input.offset.is_none());
+        assert!(input.limit.is_none());
     }
 
     #[test]

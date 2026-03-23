@@ -314,6 +314,8 @@ impl Index {
                 path: rel_path.clone(),
                 description: desc,
                 symbols: syms.clone(),
+                line_count: 0,
+                line_ranges: vec![],
                 summarized: now,
             };
 
@@ -436,6 +438,8 @@ mod tests {
                 path: PathBuf::from("src/main.rs"),
                 description: "Entry point".to_owned(),
                 symbols: vec!["main()".to_owned()],
+                line_count: 0,
+                line_ranges: vec![],
                 summarized: Utc::now(),
             })
             .await;
@@ -444,6 +448,8 @@ mod tests {
                 path: PathBuf::from("src/config.rs"),
                 description: "Configuration loading".to_owned(),
                 symbols: vec!["Config".to_owned()],
+                line_count: 0,
+                line_ranges: vec![],
                 summarized: Utc::now(),
             })
             .await;

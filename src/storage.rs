@@ -152,6 +152,8 @@ mod tests {
                 path: PathBuf::from("src/main.rs"),
                 description: "Entry point".to_owned(),
                 symbols: vec!["main()".to_owned()],
+                line_count: 0,
+                line_ranges: vec![],
                 summarized: Utc::now(),
             },
         );
