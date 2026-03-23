@@ -421,6 +421,7 @@
         <div class="toc-title">On this page</div>
         <ul>
             <li><a href="#quickstart">Quickstart</a></li>
+            <li><a href="#cli">CLI Reference</a></li>
             <li><a href="#daemon-config">Daemon Configuration</a></li>
             <li><a href="#project-config">Project Configuration</a></li>
             <li><a href="#hooks">Claude Code Hooks</a></li>
@@ -437,14 +438,35 @@
     <div class="doc-section" id="quickstart">
         <div class="section-label">Getting started</div>
         <h2>Quickstart</h2>
-        <p>Two things to do. One config file to paste, one command to run. That's genuinely it.</p>
+        <p>One command. It sets up hooks, starts the daemon, and indexes your project.</p>
 
-        <h3>1. Tell Claude Code about youwhatknow</h3>
-        <p>Add the hook config to your <strong>user-level</strong> Claude Code settings. This applies to all projects, all sessions, all subagents.</p>
+        <div class="code-block">
+            <div class="code-header"><span>terminal</span></div>
+            <div class="code-body"><span class="s">$</span> cd your-project
+<span class="s">$</span> youwhatknow setup</div>
+        </div>
+
+        <p>This creates <code>.claude/</code> and <code>.claude/summaries/</code>, merges hook configuration into <code>.claude/settings.local.json</code> (preserving any existing hooks), starts the daemon if it isn't running, and triggers initial project indexing.</p>
+
+        <div class="code-block">
+            <div class="code-header"><span>variants</span></div>
+            <div class="code-body"><span class="s">$</span> youwhatknow setup --shared    <span class="c"># writes to .claude/settings.json (team-shared)</span>
+<span class="s">$</span> youwhatknow setup --no-index  <span class="c"># skip initial indexing</span></div>
+        </div>
+
+        <p>The daemon runs on <strong>localhost:7849</strong>, indexes your projects lazily when Claude first touches them, and shuts itself down after 30 minutes of inactivity.</p>
+
+        <div class="callout">
+            If the daemon isn't running, Claude Code works completely normally. HTTP hooks fail silently &#8212; no errors, no disruption. youwhatknow is strictly additive.
+        </div>
+
+        <h3>Manual hook setup</h3>
+        <p>If you'd rather wire things up yourself, add the hook config to your Claude Code settings manually:</p>
 
         <div class="code-block">
             <div class="code-header">
                 <span>~/.claude/settings.json</span>
+                <span class="code-tag">manual alternative</span>
             </div>
             <div class="code-body">{
   <span class="k">"hooks"</span>: {
@@ -465,18 +487,51 @@
   }
 }</div>
         </div>
+        <p>Then start the daemon with <code>youwhatknow</code>.</p>
+    </div>
 
-        <h3>2. Start the daemon</h3>
+    <!-- ═══ CLI REFERENCE ═══ -->
+    <div class="doc-section" id="cli">
+        <div class="section-label">CLI</div>
+        <h2>CLI Reference</h2>
+        <p>All subcommands. The daemon itself is also started via the CLI (no arguments = start serving).</p>
+
+        <h3>youwhatknow (serve)</h3>
+        <p>Starts the HTTP daemon on <strong>localhost:7849</strong>. Indexes projects lazily on first request. Shuts itself down after <code>idle_shutdown_minutes</code> of inactivity.</p>
         <div class="code-block">
             <div class="code-header"><span>terminal</span></div>
             <div class="code-body"><span class="s">$</span> youwhatknow</div>
         </div>
 
-        <p>That's it. The daemon runs on <strong>localhost:7849</strong>, indexes your projects lazily when Claude first touches them, and shuts itself down after 30 minutes of inactivity.</p>
-
-        <div class="callout">
-            If the daemon isn't running, Claude Code works completely normally. HTTP hooks fail silently &#8212; no errors, no disruption. youwhatknow is strictly additive.
+        <h3>youwhatknow setup</h3>
+        <p>One-command project setup. Creates <code>.claude/</code> and <code>.claude/summaries/</code>, merges hook config into the settings file, starts the daemon if not running, and triggers initial indexing.</p>
+        <div class="code-block">
+            <div class="code-header"><span>terminal</span></div>
+            <div class="code-body"><span class="s">$</span> youwhatknow setup              <span class="c"># writes to .claude/settings.local.json (default)</span>
+<span class="s">$</span> youwhatknow setup --shared      <span class="c"># writes to .claude/settings.json (team-shared)</span>
+<span class="s">$</span> youwhatknow setup --no-index    <span class="c"># skip initial indexing</span></div>
         </div>
+        <p>Existing hooks in the target settings file are preserved &#8212; <code>setup</code> merges, it doesn't overwrite.</p>
+
+        <h3>youwhatknow status</h3>
+        <p>Shows daemon status: uptime, active sessions, registered projects. Talks to the running daemon via <code>/status</code>.</p>
+        <div class="code-block">
+            <div class="code-header"><span>terminal</span></div>
+            <div class="code-body"><span class="s">$</span> youwhatknow status
+<span class="v">uptime: 2h 14m</span>
+<span class="v">sessions: 3</span>
+<span class="v">projects: 2</span></div>
+        </div>
+
+        <h3>youwhatknow summary &lt;path&gt;</h3>
+        <p>Preview any file's summary without triggering a read count. Useful for checking what Claude will see before a session.</p>
+        <div class="code-block">
+            <div class="code-header"><span>terminal</span></div>
+            <div class="code-body"><span class="s">$</span> youwhatknow summary src/main.rs</div>
+        </div>
+
+        <h3>youwhatknow init</h3>
+        <p>The <strong>SessionStart</strong> hook handler. Reads the hook payload from stdin, ensures the daemon is running, and proxies the request. This is called automatically by the Claude Code hook &#8212; you don't run this manually.</p>
     </div>
 
     <!-- ═══ DAEMON CONFIG ═══ -->
@@ -542,6 +597,7 @@
             <div class="code-body"><span class="c"># All fields are optional. These are the defaults.</span>
 <span class="k">summary_path</span> = <span class="s">".claude/summaries"</span>
 <span class="k">max_file_size_kb</span> = <span class="s">100</span>
+<span class="k">line_threshold</span> = <span class="s">30</span>
 <span class="k">ignored_patterns</span> = []</div>
         </div>
 
@@ -563,6 +619,11 @@
                     <td class="config-key">max_file_size_kb</td>
                     <td class="config-default">100</td>
                     <td class="config-desc">Files larger than this (in KB) are skipped during indexing. Prevents huge generated files from bloating the index.</td>
+                </tr>
+                <tr>
+                    <td class="config-key">line_threshold</td>
+                    <td class="config-default">30</td>
+                    <td class="config-desc">Files with fewer lines than this are passed through without a summary. They're small enough to just read. Set to <strong>0</strong> to always inject summaries.</td>
                 </tr>
                 <tr>
                     <td class="config-key">ignored_patterns</td>
@@ -600,8 +661,11 @@
         <h3>SessionStart / startup</h3>
         <p>Fires when a new Claude Code session starts. The daemon injects a full project structure map so Claude knows where everything is from the start. No more exploratory file-reading spirals.</p>
 
+        <h3>Line-count gating</h3>
+        <p>Files under the <code>line_threshold</code> (default: <strong>30 lines</strong>) are passed through without any summary injection. They're small enough to just read. Only files over the threshold get the summary-first treatment.</p>
+
         <h3>What Claude sees</h3>
-        <p>On a <strong>first read</strong>, the injected context looks like:</p>
+        <p>For files above the line threshold, on a <strong>first read</strong>, the injected context looks like:</p>
         <div class="code-block">
             <div class="code-header"><span>injected into Claude's context</span></div>
             <div class="code-body"><span class="s">-- youwhatknow: src/config.rs --</span>
@@ -664,6 +728,12 @@
             <span class="endpoint-method get">GET</span>
             <span class="endpoint-path">/health</span>
             <p>Health check. Returns JSON with <code>status</code> and <code>projects</code> (number of loaded project indexes). Useful for checking if the daemon is running.</p>
+        </div>
+
+        <div class="endpoint">
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/status</span>
+            <p>Detailed daemon status. Returns JSON with uptime, active session count, and registered projects. Used by <code>youwhatknow status</code>.</p>
         </div>
     </div>
 
@@ -807,6 +877,9 @@
 
         <h3>Multi-project</h3>
         <p>One daemon handles all projects. When a hook request arrives with a <code>cwd</code> the daemon hasn't seen before, it loads the project config, reads existing summaries from disk, and starts background indexing. No per-project daemon instances needed.</p>
+
+        <h3>Worktree sharing</h3>
+        <p>Projects accessed from different git worktrees share the same index. youwhatknow resolves the <code>cwd</code> to the git root, so <code>~/project</code> and <code>~/project/.worktrees/feature</code> hit the same project entry and the same summaries.</p>
     </div>
 
     <!-- ═══ NIX ═══ -->
