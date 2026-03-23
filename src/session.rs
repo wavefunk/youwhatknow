@@ -114,6 +114,20 @@ impl SessionTracker {
         }
     }
 
+    /// Reset a file's read count to 0 for a session.
+    /// Returns true if there was a count to reset, false if already 0 or not tracked.
+    pub async fn reset_read(&self, session_id: &str, file_path: &Path) -> bool {
+        let mut state = self.inner.write().await;
+        let key = (session_id.to_owned(), file_path.to_path_buf());
+        match state.reads.get_mut(&key) {
+            Some(entry) if entry.count > 0 => {
+                entry.count = 0;
+                true
+            }
+            _ => false,
+        }
+    }
+
     /// Number of tracked sessions (not yet cleaned up).
     pub async fn session_count(&self) -> usize {
         self.inner.read().await.last_activity.len()
@@ -423,5 +437,33 @@ mod tests {
 
         // After cleanup, re-reading should start fresh at count=1
         assert_eq!(tracker.track_read("s1", &path, 40).await, 1);
+    }
+
+    #[tokio::test]
+    async fn reset_read_resets_count() {
+        let tracker = SessionTracker::new();
+        let path = PathBuf::from("src/main.rs");
+
+        // Read twice
+        tracker.track_read("s1", &path, 40).await;
+        tracker.track_read("s1", &path, 40).await;
+        assert_eq!(tracker.read_count("s1", &path).await, 2);
+
+        // Reset
+        let was_reset = tracker.reset_read("s1", &path).await;
+        assert!(was_reset);
+        assert_eq!(tracker.read_count("s1", &path).await, 0);
+
+        // Next track_read starts fresh at 1
+        assert_eq!(tracker.track_read("s1", &path, 40).await, 1);
+    }
+
+    #[tokio::test]
+    async fn reset_read_returns_false_when_not_tracked() {
+        let tracker = SessionTracker::new();
+        let path = PathBuf::from("src/never_read.rs");
+
+        let was_reset = tracker.reset_read("s1", &path).await;
+        assert!(!was_reset);
     }
 }
