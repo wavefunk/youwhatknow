@@ -71,7 +71,6 @@ impl ActivityTracker {
 pub struct AppState {
     pub registry: ProjectRegistry,
     pub session: SessionTracker,
-    #[allow(dead_code)]
     pub config: Arc<Config>,
     pub activity: ActivityTracker,
     pub started_at: Instant,
@@ -208,6 +207,7 @@ mod tests {
         assert_eq!(status.pid, std::process::id());
         assert_eq!(status.port, Config::default().port);
         assert!(status.uptime_secs < 5);
+        assert!(status.idle_secs < 5);
         assert_eq!(status.active_sessions, 0);
         assert_eq!(status.loaded_projects, 0);
         assert_eq!(
