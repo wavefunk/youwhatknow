@@ -58,18 +58,28 @@ Port is read from `Config::load()`, not hardcoded.
 5. Write settings file (pretty-printed JSON)
 6. Create `.claude/summaries/` directory if it doesn't exist
 7. Print what was written and what was preserved
-8. Unless `--no-index`: start daemon (reuse `spawn_daemon`/`wait_for_daemon`), POST to `/reindex` with current directory
+8. Unless `--no-index`: start daemon (reuse `spawn_daemon`/`wait_for_daemon`), POST `/reindex` with body `{"session_id": "setup", "cwd": "<project_root>", "hook_event_name": "Setup"}`
+   - If daemon is already running, reuse it
+   - If daemon fails to start, fail with error
+   - If `/reindex` POST fails, fail with error (daemon keeps running)
 9. Print success message
 
 No `.claude/youwhatknow.toml` is generated — defaults are sensible; users create one manually if needed.
 
 ## Hook Merging Strategy
 
-When existing settings are present, youwhatknow hooks are identified and replaced by matching:
-- `SessionStart` entries: inner hook command contains `"youwhatknow"`
-- `PreToolUse` entries: inner hook URL contains `"youwhatknow"` or the configured port on localhost
+When existing settings are present, youwhatknow hooks are identified by string-matching `"youwhatknow"` in the hook command or URL. Port numbers are not used for matching.
 
-All non-matching entries are preserved in their original order.
+Claude Code settings structure: `hooks.<EventName>` is an array of hook group objects. Each group has an optional `matcher` (string) and a `hooks` array of individual hook objects (each with `type`, `command`/`url`, `timeout`).
+
+- If `hooks` key is missing, create it as `{}`
+- If `hooks.SessionStart` or `hooks.PreToolUse` is missing, create as `[]`
+- For each hook group (object in the event array), check its `hooks` array: if ANY hook has a `command` or `url` field containing `"youwhatknow"`, remove the entire group
+- If a group has no `hooks` array or it's not an array, leave the group untouched
+- All non-matching groups are preserved in their original order
+- If the settings file exists but contains malformed JSON, fail with an error message
+
+Setup is idempotent — running it multiple times updates hook entries and re-runs indexing without data loss.
 
 ## Code Changes
 
