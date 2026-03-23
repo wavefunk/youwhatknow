@@ -45,6 +45,14 @@ enum Command {
     },
     /// Show daemon status
     Status,
+    /// Reset read count for a file (shows summary again on next read)
+    Reset {
+        /// File path relative to cwd
+        path: String,
+        /// Session ID (defaults to $YOUWHATKNOW_SESSION)
+        #[arg(long)]
+        session: Option<String>,
+    },
 }
 
 fn main() -> eyre::Result<()> {
@@ -63,6 +71,7 @@ fn main() -> eyre::Result<()> {
             cli::setup(shared, no_index)
         }
         Some(Command::Status) => cli::status(),
+        Some(Command::Reset { path, session }) => cli::reset(&path, session.as_deref()),
         Some(Command::Serve) | None => {
             tracing_subscriber::fmt()
                 .with_env_filter(
