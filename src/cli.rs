@@ -2,6 +2,32 @@ use std::io::{self, Read};
 use std::time::{Duration, Instant};
 
 use crate::config::Config;
+use crate::types::StatusResponse;
+
+fn format_duration(total_secs: u64) -> String {
+    if total_secs == 0 {
+        return "0s".to_owned();
+    }
+
+    let days = total_secs / 86400;
+    let hours = (total_secs % 86400) / 3600;
+    let minutes = (total_secs % 3600) / 60;
+    let seconds = total_secs % 60;
+
+    let parts: Vec<String> = [
+        (days, "d"),
+        (hours, "h"),
+        (minutes, "m"),
+        (seconds, "s"),
+    ]
+    .into_iter()
+    .filter(|(v, _)| *v > 0)
+    .take(2)
+    .map(|(v, u)| format!("{v}{u}"))
+    .collect();
+
+    parts.join(" ")
+}
 
 /// Handle the `init` subcommand: ensure daemon is running, proxy SessionStart.
 pub fn init() -> eyre::Result<()> {
@@ -74,6 +100,45 @@ pub fn summary(file_path: &str) -> eyre::Result<()> {
     }
 
     print!("{text}");
+    Ok(())
+}
+
+/// Handle the `status` subcommand: query daemon and display status.
+pub fn status() -> eyre::Result<()> {
+    let config = Config::load()?;
+    let base_url = format!("http://127.0.0.1:{}", config.port);
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()?;
+
+    let resp = match client.get(format!("{base_url}/status")).send() {
+        Ok(r) => r,
+        Err(e) if e.is_connect() => {
+            eprintln!("daemon is not running");
+            std::process::exit(1);
+        }
+        Err(e) => {
+            eprintln!("failed to reach daemon: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    if !resp.status().is_success() {
+        eprintln!("daemon returned {}", resp.status());
+        std::process::exit(1);
+    }
+
+    let status: StatusResponse = resp.json()?;
+
+    println!("youwhatknow daemon running (pid {})", status.pid);
+    println!("  port:             {}", status.port);
+    println!("  uptime:           {}", format_duration(status.uptime_secs));
+    println!("  idle:             {}", format_duration(status.idle_secs));
+    println!("  sessions:         {}", status.active_sessions);
+    println!("  projects:         {}", status.loaded_projects);
+    println!("  idle shutdown:    {}m", status.idle_shutdown_minutes);
+
     Ok(())
 }
 
@@ -323,6 +388,38 @@ fn merge_hooks(mut settings: serde_json::Value, port: u16) -> MergeResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn format_duration_zero() {
+        assert_eq!(format_duration(0), "0s");
+    }
+
+    #[test]
+    fn format_duration_seconds_only() {
+        assert_eq!(format_duration(45), "45s");
+    }
+
+    #[test]
+    fn format_duration_minutes_and_seconds() {
+        assert_eq!(format_duration(72), "1m 12s");
+    }
+
+    #[test]
+    fn format_duration_hours_and_minutes() {
+        assert_eq!(format_duration(4320), "1h 12m");
+    }
+
+    #[test]
+    fn format_duration_days_and_hours() {
+        assert_eq!(format_duration(90000), "1d 1h");
+    }
+
+    #[test]
+    fn format_duration_exact_boundary() {
+        assert_eq!(format_duration(60), "1m");
+        assert_eq!(format_duration(3600), "1h");
+        assert_eq!(format_duration(86400), "1d");
+    }
 
     #[test]
     fn daemon_not_running_on_random_port() {

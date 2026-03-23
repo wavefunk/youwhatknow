@@ -43,6 +43,8 @@ enum Command {
         #[arg(long)]
         no_index: bool,
     },
+    /// Show daemon status
+    Status,
 }
 
 fn main() -> eyre::Result<()> {
@@ -60,6 +62,7 @@ fn main() -> eyre::Result<()> {
         Some(Command::Setup { shared, local: _, no_index }) => {
             cli::setup(shared, no_index)
         }
+        Some(Command::Status) => cli::status(),
         Some(Command::Serve) | None => {
             tracing_subscriber::fmt()
                 .with_env_filter(
