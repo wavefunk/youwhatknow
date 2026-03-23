@@ -268,7 +268,7 @@ fn is_youwhatknow_group(group: &serde_json::Value) -> bool {
         let url = hook.get("url").and_then(|v| v.as_str()).unwrap_or("");
         cmd.contains("youwhatknow")
             || url.contains("youwhatknow")
-            || (url.contains("localhost") && url.contains("/hook/pre-read"))
+            || (url.contains("localhost") && url.ends_with("/hook/pre-read"))
     })
 }
 
@@ -278,13 +278,21 @@ fn merge_hooks(mut settings: serde_json::Value, port: u16) -> MergeResult {
     let our_hooks = build_hooks_value(port);
     let mut preserved = 0;
 
-    let hooks = settings
-        .as_object_mut()
-        .expect("settings must be an object")
+    // Ensure settings is an object
+    if !settings.is_object() {
+        settings = serde_json::json!({});
+    }
+
+    let obj = settings.as_object_mut().expect("just verified");
+    let hooks = obj
         .entry("hooks")
         .or_insert_with(|| serde_json::json!({}));
 
-    let hooks_obj = hooks.as_object_mut().expect("hooks must be an object");
+    // If hooks is not an object, replace it
+    if !hooks.is_object() {
+        *hooks = serde_json::json!({});
+    }
+    let hooks_obj = hooks.as_object_mut().expect("just verified");
 
     for event_name in ["SessionStart", "PreToolUse"] {
         let existing: Vec<serde_json::Value> = hooks_obj

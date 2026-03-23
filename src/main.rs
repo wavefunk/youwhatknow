@@ -34,10 +34,10 @@ enum Command {
     /// Initialize a project to use youwhatknow
     Setup {
         /// Write hooks to .claude/settings.json (shared with team)
-        #[arg(long)]
+        #[arg(long, conflicts_with = "local")]
         shared: bool,
         /// Write hooks to .claude/settings.local.json (default, per-developer)
-        #[arg(long)]
+        #[arg(long, conflicts_with = "shared")]
         local: bool,
         /// Skip initial indexing
         #[arg(long)]
