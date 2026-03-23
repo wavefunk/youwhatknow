@@ -42,6 +42,24 @@ impl SessionTracker {
         result
     }
 
+    /// Set the read count to 1 if currently 0. Used by the CLI summary endpoint
+    /// so that a subsequent Read hook sees count=2 and allows through.
+    /// Returns true if the count was set (was 0), false if already tracked.
+    pub async fn track_summary(&self, session_id: &str, file_path: &Path) -> bool {
+        let mut state = self.inner.write().await;
+        let key = (session_id.to_owned(), file_path.to_path_buf());
+        let count = state.reads.entry(key).or_insert(0);
+        if *count == 0 {
+            *count = 1;
+            state
+                .last_activity
+                .insert(session_id.to_owned(), Instant::now());
+            true
+        } else {
+            false
+        }
+    }
+
     /// Get the current read count without incrementing.
     #[cfg(test)]
     pub async fn read_count(&self, session_id: &str, file_path: &Path) -> u32 {
@@ -126,6 +144,41 @@ mod tests {
         assert_eq!(tracker.track_read("s1", &p2).await, 1);
         assert_eq!(tracker.track_read("s1", &p1).await, 2);
         assert_eq!(tracker.read_count("s1", &p2).await, 1);
+    }
+
+    #[tokio::test]
+    async fn track_summary_sets_count_to_one_if_zero() {
+        let tracker = SessionTracker::new();
+        let path = PathBuf::from("src/main.rs");
+
+        let set = tracker.track_summary("s1", &path).await;
+        assert!(set);
+        assert_eq!(tracker.read_count("s1", &path).await, 1);
+    }
+
+    #[tokio::test]
+    async fn track_summary_does_not_increment_if_already_tracked() {
+        let tracker = SessionTracker::new();
+        let path = PathBuf::from("src/main.rs");
+
+        tracker.track_read("s1", &path).await;
+        assert_eq!(tracker.read_count("s1", &path).await, 1);
+
+        let set = tracker.track_summary("s1", &path).await;
+        assert!(!set);
+        assert_eq!(tracker.read_count("s1", &path).await, 1);
+    }
+
+    #[tokio::test]
+    async fn track_summary_then_read_allows() {
+        let tracker = SessionTracker::new();
+        let path = PathBuf::from("src/main.rs");
+
+        tracker.track_summary("s1", &path).await;
+        assert_eq!(tracker.read_count("s1", &path).await, 1);
+
+        let count = tracker.track_read("s1", &path).await;
+        assert_eq!(count, 2);
     }
 
     #[tokio::test]
