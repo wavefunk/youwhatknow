@@ -450,4 +450,60 @@ mod tests {
             "should mention indexing"
         );
     }
+
+    #[tokio::test]
+    async fn eviction_resets_gating_cycle() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let root = tmp.path();
+        let index = setup_index(227, large_line_ranges()).await;
+        let session = SessionTracker::new();
+        let config = ProjectConfig {
+            eviction_threshold: 40,
+            ..default_config()
+        };
+
+        let request = HookRequest {
+            session_id: "s1".to_owned(),
+            cwd: root.to_path_buf(),
+            hook_event_name: "PreToolUse".to_owned(),
+            tool_name: Some("Read".to_owned()),
+            tool_input: Some(ToolInput {
+                file_path: root.join("src/main.rs"),
+                offset: None,
+                limit: None,
+            }),
+        };
+
+        // First read: denied (count=1)
+        let resp = handle_pre_read(&index, &session, root, &config, &request).await;
+        assert_eq!(
+            resp.hook_specific_output.permission_decision.as_deref(),
+            Some("deny")
+        );
+
+        // Second read: allowed (count=2)
+        let resp = handle_pre_read(&index, &session, root, &config, &request).await;
+        assert_eq!(
+            resp.hook_specific_output.permission_decision.as_deref(),
+            Some("allow")
+        );
+
+        // Advance sequence by 41 reads on other files via session tracker directly
+        for i in 0..41 {
+            let other = PathBuf::from(format!("/tmp/other_{i}.rs"));
+            session.track_read("s1", &other, 40).await;
+        }
+
+        // Read original file again: should be evicted, denied with summary (count=1)
+        let resp = handle_pre_read(&index, &session, root, &config, &request).await;
+        assert_eq!(
+            resp.hook_specific_output.permission_decision.as_deref(),
+            Some("deny")
+        );
+        assert!(resp
+            .hook_specific_output
+            .permission_decision_reason
+            .as_deref()
+            .is_some_and(|r| r.contains("youwhatknow")));
+    }
 }
