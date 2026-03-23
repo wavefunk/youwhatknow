@@ -89,9 +89,9 @@ async fn pre_read_handler(
     Json(request): Json<HookRequest>,
 ) -> Json<HookResponse> {
     state.activity.touch();
-    let (index, _config) = state.registry.get_or_load(&request.cwd).await;
+    let (index, config) = state.registry.get_or_load(&request.cwd).await;
     let response =
-        hooks::handle_pre_read(&index, &state.session, &request.cwd, &request).await;
+        hooks::handle_pre_read(&index, &state.session, &request.cwd, &config, &request).await;
     Json(response)
 }
 
@@ -100,8 +100,8 @@ async fn session_start_handler(
     Json(request): Json<HookRequest>,
 ) -> Json<HookResponse> {
     state.activity.touch();
-    let (index, _config) = state.registry.get_or_load(&request.cwd).await;
-    let response = hooks::handle_session_start(&index).await;
+    let (index, config) = state.registry.get_or_load(&request.cwd).await;
+    let response = hooks::handle_session_start(&index, &config).await;
     Json(response)
 }
 

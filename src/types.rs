@@ -77,10 +77,8 @@ pub struct ToolInput {
     #[serde(alias = "filePath")]
     pub file_path: PathBuf,
     #[serde(default)]
-    #[allow(dead_code)]
     pub offset: Option<u32>,
     #[serde(default)]
-    #[allow(dead_code)]
     pub limit: Option<u32>,
 }
 
