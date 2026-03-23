@@ -77,6 +77,79 @@ pub fn summary(file_path: &str) -> eyre::Result<()> {
     Ok(())
 }
 
+/// Handle the `setup` subcommand: configure hooks and optionally trigger indexing.
+pub fn setup(shared: bool, no_index: bool) -> eyre::Result<()> {
+    let cwd = std::env::current_dir()?;
+    let config = Config::load()?;
+
+    // 1. Determine target file
+    let claude_dir = cwd.join(".claude");
+    let target_file = if shared {
+        claude_dir.join("settings.json")
+    } else {
+        claude_dir.join("settings.local.json")
+    };
+
+    // 2. Create .claude/ directory
+    std::fs::create_dir_all(&claude_dir)?;
+
+    // 3. Read existing settings or start fresh
+    let existing: serde_json::Value = if target_file.exists() {
+        let content = std::fs::read_to_string(&target_file)?;
+        serde_json::from_str(&content)
+            .map_err(|e| eyre::eyre!("malformed JSON in {}: {e}", target_file.display()))?
+    } else {
+        serde_json::json!({})
+    };
+
+    // 4. Merge hooks
+    let MergeResult { settings: merged, preserved } = merge_hooks(existing, config.port);
+
+    // 5. Write settings file
+    let json_str = serde_json::to_string_pretty(&merged)?;
+    std::fs::write(&target_file, format!("{json_str}\n"))?;
+    eprintln!("Wrote hooks to {}", target_file.display());
+    if preserved > 0 {
+        eprintln!("Preserved {preserved} existing hook group(s).");
+    }
+
+    // 6. Create summaries directory
+    let summaries_dir = claude_dir.join("summaries");
+    std::fs::create_dir_all(&summaries_dir)?;
+
+    // 7. Optionally trigger indexing
+    if !no_index {
+        let base_url = format!("http://127.0.0.1:{}", config.port);
+        if !daemon_is_running(&base_url) {
+            eprintln!("Starting daemon...");
+            spawn_daemon()?;
+            wait_for_daemon(&base_url)?;
+        }
+
+        eprintln!("Indexing project...");
+        let client = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(30))
+            .build()?;
+
+        let resp = client
+            .post(format!("{base_url}/reindex"))
+            .header("content-type", "application/json")
+            .body(serde_json::to_string(&serde_json::json!({
+                "session_id": "setup",
+                "cwd": cwd,
+                "hook_event_name": "Setup"
+            }))?)
+            .send()?;
+
+        if !resp.status().is_success() {
+            eyre::bail!("reindex failed: {}", resp.status());
+        }
+    }
+
+    eprintln!("Setup complete.");
+    Ok(())
+}
+
 fn daemon_is_running(base_url: &str) -> bool {
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(5))

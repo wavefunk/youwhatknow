@@ -31,6 +31,18 @@ enum Command {
         /// File path relative to cwd
         path: String,
     },
+    /// Initialize a project to use youwhatknow
+    Setup {
+        /// Write hooks to .claude/settings.json (shared with team)
+        #[arg(long)]
+        shared: bool,
+        /// Write hooks to .claude/settings.local.json (default, per-developer)
+        #[arg(long)]
+        local: bool,
+        /// Skip initial indexing
+        #[arg(long)]
+        no_index: bool,
+    },
 }
 
 fn main() -> eyre::Result<()> {
@@ -44,6 +56,9 @@ fn main() -> eyre::Result<()> {
         Some(Command::Summary { path }) => {
             // No tracing for CLI — stdout is for Claude Code
             cli::summary(&path)
+        }
+        Some(Command::Setup { shared, local: _, no_index }) => {
+            cli::setup(shared, no_index)
         }
         Some(Command::Serve) | None => {
             tracing_subscriber::fmt()
