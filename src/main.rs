@@ -26,6 +26,11 @@ enum Command {
     Serve,
     /// Handle SessionStart hook (reads stdin, proxies to daemon)
     Init,
+    /// Show file summary without triggering a read
+    Summary {
+        /// File path relative to cwd
+        path: String,
+    },
 }
 
 fn main() -> eyre::Result<()> {
@@ -35,6 +40,10 @@ fn main() -> eyre::Result<()> {
         Some(Command::Init) => {
             // No tracing for CLI — stdout is for Claude Code
             cli::init()
+        }
+        Some(Command::Summary { path }) => {
+            // No tracing for CLI — stdout is for Claude Code
+            cli::summary(&path)
         }
         Some(Command::Serve) | None => {
             tracing_subscriber::fmt()
