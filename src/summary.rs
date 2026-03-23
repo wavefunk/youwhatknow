@@ -24,11 +24,7 @@ pub fn render_file_summary(file_summary: &FileSummary, _config: &ProjectConfig) 
         let max_range_width = file_summary
             .line_ranges
             .iter()
-            .map(|r| {
-                // digit count without allocating
-                let s = digit_count(r.start) + 1 + digit_count(r.end);
-                s
-            })
+            .map(|r| digit_count(r.start) + 1 + digit_count(r.end))
             .max()
             .unwrap_or(0);
         for range in &file_summary.line_ranges {

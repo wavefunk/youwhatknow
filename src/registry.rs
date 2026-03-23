@@ -72,22 +72,22 @@ impl ProjectRegistry {
         }
 
         // Check if main_root already has an entry (worktree of known project)
-        if main_root != *cwd {
-            if let Some(entry) = state.projects.get(&main_root) {
-                let alias = ProjectEntry {
-                    index: entry.index.clone(),
-                    config: entry.config.clone(),
-                };
-                let result = (alias.index.clone(), alias.config.clone());
-                // Register cwd as alias so future lookups are fast
-                state.projects.insert(cwd.to_path_buf(), alias);
-                tracing::info!(
-                    worktree = %cwd.display(),
-                    main = %main_root.display(),
-                    "linked worktree to existing project index"
-                );
-                return result;
-            }
+        if main_root != *cwd
+            && let Some(entry) = state.projects.get(&main_root)
+        {
+            let alias = ProjectEntry {
+                index: entry.index.clone(),
+                config: entry.config.clone(),
+            };
+            let result = (alias.index.clone(), alias.config.clone());
+            // Register cwd as alias so future lookups are fast
+            state.projects.insert(cwd.to_path_buf(), alias);
+            tracing::info!(
+                worktree = %cwd.display(),
+                main = %main_root.display(),
+                "linked worktree to existing project index"
+            );
+            return result;
         }
 
         // New project

@@ -9,18 +9,15 @@ pub fn init() -> eyre::Result<()> {
     io::stdin().read_to_string(&mut input)?;
 
     // Write session ID to CLAUDE_ENV_FILE if available
-    if let Ok(env_file) = std::env::var("CLAUDE_ENV_FILE") {
-        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&input) {
-            if let Some(session_id) = parsed
-                .get("sessionId")
-                .or_else(|| parsed.get("session_id"))
-                .and_then(|v| v.as_str())
-            {
-                if let Err(e) = write_env_file(&env_file, session_id) {
-                    eprintln!("warning: failed to write CLAUDE_ENV_FILE: {e}");
-                }
-            }
-        }
+    if let Ok(env_file) = std::env::var("CLAUDE_ENV_FILE")
+        && let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&input)
+        && let Some(session_id) = parsed
+            .get("sessionId")
+            .or_else(|| parsed.get("session_id"))
+            .and_then(|v| v.as_str())
+        && let Err(e) = write_env_file(&env_file, session_id)
+    {
+        eprintln!("warning: failed to write CLAUDE_ENV_FILE: {e}");
     }
 
     let config = Config::load()?;

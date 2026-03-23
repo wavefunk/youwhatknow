@@ -27,7 +27,6 @@ pub struct FileSummary {
 }
 
 /// Result of analyzing a file with tree-sitter. Internal to the indexer.
-#[allow(dead_code)]
 pub struct FileAnalysis {
     pub symbols: Vec<String>,
     pub line_ranges: Vec<LineRange>,

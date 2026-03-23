@@ -14,6 +14,7 @@ use crate::types::{HookRequest, HookResponse};
 /// 3. No summary in index → allow, no context
 /// 4. Targeted read (offset or limit present) → allow, no context
 /// 5. Small file (line_count <= threshold) → allow, no context
+///
 /// 6-7. track_read → count 1 deny with summary; count 2 allow clean; count 3+ allow with nudge
 pub async fn handle_pre_read(
     index: &Index,
