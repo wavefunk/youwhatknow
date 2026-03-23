@@ -67,6 +67,8 @@ pub struct ProjectConfig {
     pub max_concurrent_batches: usize,
     #[serde(default = "default_line_threshold")]
     pub line_threshold: u32,
+    #[serde(default = "default_eviction_threshold")]
+    pub eviction_threshold: u32,
 }
 
 fn default_summary_path() -> String {
@@ -81,6 +83,9 @@ fn default_max_concurrent_batches() -> usize {
 fn default_line_threshold() -> u32 {
     30
 }
+fn default_eviction_threshold() -> u32 {
+    40
+}
 
 impl Default for ProjectConfig {
     fn default() -> Self {
@@ -90,6 +95,7 @@ impl Default for ProjectConfig {
             max_file_size_kb: default_max_file_size(),
             max_concurrent_batches: default_max_concurrent_batches(),
             line_threshold: default_line_threshold(),
+            eviction_threshold: default_eviction_threshold(),
         }
     }
 }
@@ -226,6 +232,42 @@ max_file_size_kb = 50
 
         let config = ProjectConfig::load(tmp.path()).expect("load");
         assert_eq!(config.line_threshold, 50);
+    }
+
+    #[test]
+    fn default_project_config_has_eviction_threshold() {
+        let config = ProjectConfig::default();
+        assert_eq!(config.eviction_threshold, 40);
+    }
+
+    #[test]
+    fn eviction_threshold_from_toml() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let config_dir = tmp.path().join(".claude");
+        std::fs::create_dir_all(&config_dir).expect("mkdir");
+        std::fs::write(
+            config_dir.join("youwhatknow.toml"),
+            "eviction_threshold = 20\n",
+        )
+        .expect("write");
+
+        let config = ProjectConfig::load(tmp.path()).expect("load");
+        assert_eq!(config.eviction_threshold, 20);
+    }
+
+    #[test]
+    fn eviction_threshold_zero_from_toml() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let config_dir = tmp.path().join(".claude");
+        std::fs::create_dir_all(&config_dir).expect("mkdir");
+        std::fs::write(
+            config_dir.join("youwhatknow.toml"),
+            "eviction_threshold = 0\n",
+        )
+        .expect("write");
+
+        let config = ProjectConfig::load(tmp.path()).expect("load");
+        assert_eq!(config.eviction_threshold, 0);
     }
 
     #[test]
