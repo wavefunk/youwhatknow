@@ -90,6 +90,7 @@ impl Index {
     }
 
     /// Look up the folder summary for a given relative path.
+    #[allow(dead_code)] // will be used by future folder-summary endpoint
     pub async fn lookup_folder(&self, rel_path: &Path) -> Option<FolderSummary> {
         let folder = discovery::file_folder(rel_path);
         let key = storage::folder_to_key(&folder);
