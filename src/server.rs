@@ -12,7 +12,8 @@ use crate::config::Config;
 use crate::hooks;
 use crate::registry::ProjectRegistry;
 use crate::session::SessionTracker;
-use crate::types::{HealthResponse, HookRequest, HookResponse};
+use crate::summary;
+use crate::types::{HealthResponse, HookRequest, HookResponse, SummaryRequest};
 
 /// Tracks when the last request was received for idle shutdown.
 #[derive(Clone)]
@@ -79,6 +80,7 @@ pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/hook/pre-read", post(pre_read_handler))
         .route("/hook/session-start", post(session_start_handler))
+        .route("/hook/summary", post(summary_handler))
         .route("/reindex", post(reindex_handler))
         .route("/health", get(health_handler))
         .with_state(state)
@@ -121,6 +123,34 @@ async fn health_handler(State(state): State<AppState>) -> Json<HealthResponse> {
         status: "ok".to_owned(),
         projects,
     })
+}
+
+async fn summary_handler(
+    State(state): State<AppState>,
+    Json(request): Json<SummaryRequest>,
+) -> String {
+    state.activity.touch();
+
+    if request.session_id.is_none() {
+        tracing::warn!("summary request without session_id");
+    }
+
+    let (index, config) = state.registry.get_or_load(&request.cwd).await;
+
+    let Some(file_summary) = index.lookup_file(&request.file_path).await else {
+        return format!(
+            "No summary available for {}. Try running `youwhatknow init` to trigger reindexing.",
+            request.file_path.display()
+        );
+    };
+
+    // Conditionally set read count to 1 if session provided
+    if let Some(session_id) = &request.session_id {
+        let abs_path = request.cwd.join(&request.file_path);
+        state.session.track_summary(session_id, &abs_path).await;
+    }
+
+    summary::render_file_summary(&file_summary, &config)
 }
 
 #[cfg(test)]
@@ -222,5 +252,76 @@ mod tests {
         tracker.touch();
         let idle_after = tracker.idle_duration();
         assert!(idle_after < Duration::from_secs(2));
+    }
+
+    #[tokio::test]
+    async fn summary_endpoint_returns_text() {
+        use std::path::Path;
+
+        let state = test_state();
+        let (index, _) = state
+            .registry
+            .get_or_load(Path::new("/tmp/test-project"))
+            .await;
+        index
+            .insert_file(crate::types::FileSummary {
+                path: std::path::PathBuf::from("src/main.rs"),
+                description: "Entry point".to_owned(),
+                symbols: vec!["main()".to_owned()],
+                line_count: 52,
+                line_ranges: vec![],
+                summarized: chrono::Utc::now(),
+            })
+            .await;
+
+        let app = router(state);
+
+        let body = serde_json::json!({
+            "session_id": "test-session",
+            "cwd": "/tmp/test-project",
+            "file_path": "src/main.rs"
+        });
+
+        let req = Request::builder()
+            .uri("/hook/summary")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_string(&body).expect("json")))
+            .expect("request");
+
+        let resp = app.oneshot(req).await.expect("response");
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), 4096)
+            .await
+            .expect("body");
+        let text = String::from_utf8(body.to_vec()).expect("utf8");
+        assert!(text.contains("Entry point"));
+    }
+
+    #[tokio::test]
+    async fn summary_endpoint_no_summary() {
+        let app = router(test_state());
+
+        let body = serde_json::json!({
+            "cwd": "/tmp/test-project",
+            "file_path": "nonexistent.rs"
+        });
+
+        let req = Request::builder()
+            .uri("/hook/summary")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_string(&body).expect("json")))
+            .expect("request");
+
+        let resp = app.oneshot(req).await.expect("response");
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), 4096)
+            .await
+            .expect("body");
+        let text = String::from_utf8(body.to_vec()).expect("utf8");
+        assert!(text.contains("reindex"));
     }
 }

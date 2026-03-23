@@ -149,6 +149,16 @@ impl HookResponse {
     }
 }
 
+// ── Summary request (CLI → daemon) ──
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SummaryRequest {
+    #[serde(default, alias = "sessionId")]
+    pub session_id: Option<String>,
+    pub cwd: PathBuf,
+    pub file_path: PathBuf,
+}
+
 // ── Health check ──
 
 #[derive(Debug, Serialize, Deserialize)]
