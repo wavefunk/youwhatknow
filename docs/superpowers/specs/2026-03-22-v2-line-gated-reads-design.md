@@ -271,6 +271,7 @@ For unsupported languages: `line_ranges` is empty. Summary still shows descripti
 - `cli.rs` — add `summary()`, update `init()` for `CLAUDE_ENV_FILE`
 - `indexer/symbols.rs` — refactor to `analyze_file()` returning `FileAnalysis`
 - `indexer/mod.rs` — use `FileAnalysis`, store `line_count` and `line_ranges`
+- `session.rs` — add `track_summary()` (conditional set to 1 if count is 0, used by `/hook/summary` endpoint)
 - `config.rs` — add `line_threshold` to `ProjectConfig`
 
 ### New
