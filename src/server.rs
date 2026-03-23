@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -13,7 +13,7 @@ use crate::hooks;
 use crate::registry::ProjectRegistry;
 use crate::session::SessionTracker;
 use crate::summary;
-use crate::types::{HealthResponse, HookRequest, HookResponse, SummaryRequest};
+use crate::types::{HealthResponse, HookRequest, HookResponse, StatusResponse, SummaryRequest};
 
 /// Tracks when the last request was received for idle shutdown.
 #[derive(Clone)]
@@ -74,6 +74,7 @@ pub struct AppState {
     #[allow(dead_code)]
     pub config: Arc<Config>,
     pub activity: ActivityTracker,
+    pub started_at: Instant,
 }
 
 pub fn router(state: AppState) -> Router {
@@ -83,6 +84,7 @@ pub fn router(state: AppState) -> Router {
         .route("/hook/summary", post(summary_handler))
         .route("/reindex", post(reindex_handler))
         .route("/health", get(health_handler))
+        .route("/status", get(status_handler))
         .with_state(state)
 }
 
@@ -122,6 +124,20 @@ async fn health_handler(State(state): State<AppState>) -> Json<HealthResponse> {
     Json(HealthResponse {
         status: "ok".to_owned(),
         projects,
+    })
+}
+
+async fn status_handler(State(state): State<AppState>) -> Json<StatusResponse> {
+    // Intentionally does NOT call activity.touch() —
+    // polling status must not prevent idle shutdown.
+    Json(StatusResponse {
+        pid: std::process::id(),
+        port: state.config.port,
+        uptime_secs: state.started_at.elapsed().as_secs(),
+        idle_secs: state.activity.idle_duration().as_secs(),
+        active_sessions: state.session.session_count().await,
+        loaded_projects: state.registry.project_count().await,
+        idle_shutdown_minutes: state.config.idle_shutdown_minutes,
     })
 }
 
@@ -166,7 +182,38 @@ mod tests {
             session: SessionTracker::new(),
             config: Arc::new(Config::default()),
             activity: ActivityTracker::new(),
+            started_at: Instant::now(),
         }
+    }
+
+    #[tokio::test]
+    async fn status_endpoint_returns_status() {
+        let app = router(test_state());
+
+        let req = Request::builder()
+            .uri("/status")
+            .method("GET")
+            .body(Body::empty())
+            .expect("request");
+
+        let resp = app.oneshot(req).await.expect("response");
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .expect("body");
+        let status: crate::types::StatusResponse =
+            serde_json::from_slice(&body).expect("deserialize");
+
+        assert_eq!(status.pid, std::process::id());
+        assert_eq!(status.port, Config::default().port);
+        assert!(status.uptime_secs < 5);
+        assert_eq!(status.active_sessions, 0);
+        assert_eq!(status.loaded_projects, 0);
+        assert_eq!(
+            status.idle_shutdown_minutes,
+            Config::default().idle_shutdown_minutes
+        );
     }
 
     #[tokio::test]

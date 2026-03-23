@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use eyre::Context;
 use tokio::net::TcpListener;
@@ -51,6 +51,7 @@ pub async fn run_on_port(port: u16) -> eyre::Result<()> {
         session,
         config: Arc::new(config.clone()),
         activity: activity.clone(),
+        started_at: Instant::now(),
     };
     let app = server::router(state);
 
