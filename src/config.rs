@@ -65,6 +65,8 @@ pub struct ProjectConfig {
     pub max_file_size_kb: u64,
     #[serde(default = "default_max_concurrent_batches")]
     pub max_concurrent_batches: usize,
+    #[serde(default = "default_line_threshold")]
+    pub line_threshold: u32,
 }
 
 fn default_summary_path() -> String {
@@ -76,6 +78,9 @@ fn default_max_file_size() -> u64 {
 fn default_max_concurrent_batches() -> usize {
     4
 }
+fn default_line_threshold() -> u32 {
+    30
+}
 
 impl Default for ProjectConfig {
     fn default() -> Self {
@@ -84,6 +89,7 @@ impl Default for ProjectConfig {
             ignored_patterns: Vec::new(),
             max_file_size_kb: default_max_file_size(),
             max_concurrent_batches: default_max_concurrent_batches(),
+            line_threshold: default_line_threshold(),
         }
     }
 }
@@ -199,6 +205,27 @@ max_file_size_kb = 50
         assert_eq!(config.summary_path, "custom/summaries");
         assert_eq!(config.ignored_patterns, vec!["*.bak"]);
         assert_eq!(config.max_file_size_kb, 50);
+    }
+
+    #[test]
+    fn default_project_config_has_line_threshold() {
+        let config = ProjectConfig::default();
+        assert_eq!(config.line_threshold, 30);
+    }
+
+    #[test]
+    fn project_config_line_threshold_from_toml() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let config_dir = tmp.path().join(".claude");
+        std::fs::create_dir_all(&config_dir).expect("mkdir");
+        std::fs::write(
+            config_dir.join("youwhatknow.toml"),
+            "line_threshold = 50\n",
+        )
+        .expect("write");
+
+        let config = ProjectConfig::load(tmp.path()).expect("load");
+        assert_eq!(config.line_threshold, 50);
     }
 
     #[test]
