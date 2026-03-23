@@ -166,6 +166,19 @@ pub struct HealthResponse {
     pub projects: usize,
 }
 
+// ── Status check ──
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StatusResponse {
+    pub pid: u32,
+    pub port: u16,
+    pub uptime_secs: u64,
+    pub idle_secs: u64,
+    pub active_sessions: usize,
+    pub loaded_projects: usize,
+    pub idle_shutdown_minutes: u64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
