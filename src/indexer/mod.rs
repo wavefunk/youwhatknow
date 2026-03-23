@@ -269,28 +269,35 @@ impl Index {
         tracing::info!("incremental index complete");
     }
 
-    /// Index a set of files: extract symbols, generate descriptions, update in-memory + disk.
+    /// Index a set of files: analyze, generate descriptions, update in-memory + disk.
     async fn index_files(&self, project_root: &Path, config: &ProjectConfig, files: &[PathBuf]) {
-        // Extract symbols
-        let mut file_symbols: Vec<(PathBuf, Vec<String>)> = Vec::new();
-        tracing::info!(files = files.len(), "extracting symbols");
+        use crate::types::FileAnalysis;
+
+        let mut file_analyses: Vec<(PathBuf, FileAnalysis)> = Vec::new();
+        tracing::info!(files = files.len(), "analyzing files");
         for rel_path in files {
-            tracing::trace!(file = %rel_path.display(), "extracting symbols");
+            tracing::trace!(file = %rel_path.display(), "analyzing");
             let abs_path = project_root.join(rel_path);
             let source = match std::fs::read(&abs_path) {
                 Ok(s) => s,
                 Err(_) => continue,
             };
-            let syms = symbols::extract_symbols(rel_path, &source);
-            file_symbols.push((rel_path.clone(), syms));
+            let analysis = symbols::analyze_file(rel_path, &source);
+            file_analyses.push((rel_path.clone(), analysis));
             self.inner.indexed_count.fetch_add(1, Ordering::Relaxed);
         }
-        tracing::info!(files = file_symbols.len(), "symbol extraction complete");
+        tracing::info!(files = file_analyses.len(), "file analysis complete");
+
+        // Build symbols list for description generation
+        let file_symbols_for_describe: Vec<(PathBuf, Vec<String>)> = file_analyses
+            .iter()
+            .map(|(path, analysis)| (path.clone(), analysis.symbols.clone()))
+            .collect();
 
         // Generate file descriptions
         let descriptions = describe::generate_descriptions(
             project_root,
-            &file_symbols,
+            &file_symbols_for_describe,
             config.max_concurrent_batches,
         ).await;
 
@@ -298,7 +305,7 @@ impl Index {
         let now = Utc::now();
         let mut folder_files: HashMap<String, Vec<(String, FileSummary)>> = HashMap::new();
 
-        for (rel_path, syms) in &file_symbols {
+        for (rel_path, analysis) in &file_analyses {
             let desc = descriptions
                 .get(rel_path)
                 .cloned()
@@ -307,15 +314,15 @@ impl Index {
                         .file_name()
                         .and_then(|n| n.to_str())
                         .unwrap_or_default();
-                    describe::fallback_description(filename, syms)
+                    describe::fallback_description(filename, &analysis.symbols)
                 });
 
             let summary = FileSummary {
                 path: rel_path.clone(),
                 description: desc,
-                symbols: syms.clone(),
-                line_count: 0,
-                line_ranges: vec![],
+                symbols: analysis.symbols.clone(),
+                line_count: analysis.line_count,
+                line_ranges: analysis.line_ranges.clone(),
                 summarized: now,
             };
 
@@ -487,5 +494,28 @@ mod tests {
         assert!(!index.is_ready());
         index.set_ready(true);
         assert!(index.is_ready());
+    }
+
+    #[tokio::test]
+    async fn insert_file_with_line_ranges() {
+        let index = Index::new();
+        let summary = FileSummary {
+            path: PathBuf::from("src/server.rs"),
+            description: "Server".to_owned(),
+            symbols: vec!["router()".to_owned()],
+            line_count: 227,
+            line_ranges: vec![crate::types::LineRange {
+                start: 1,
+                end: 67,
+                label: "ActivityTracker".to_owned(),
+            }],
+            summarized: Utc::now(),
+        };
+        index.insert_file(summary.clone()).await;
+
+        let looked_up = index.lookup_file(Path::new("src/server.rs")).await.unwrap();
+        assert_eq!(looked_up.line_count, 227);
+        assert_eq!(looked_up.line_ranges.len(), 1);
+        assert_eq!(looked_up.line_ranges[0].label, "ActivityTracker");
     }
 }
