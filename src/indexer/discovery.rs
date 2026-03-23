@@ -276,6 +276,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires git, skipped in sandboxed builds"]
     fn resolve_main_worktree_in_regular_repo() {
         // In a non-worktree repo, resolve_main_worktree should return
         // the same path as git rev-parse --show-toplevel
