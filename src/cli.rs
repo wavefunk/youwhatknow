@@ -158,6 +158,85 @@ fn write_env_file(env_file_path: &str, session_id: &str) -> eyre::Result<()> {
     Ok(())
 }
 
+/// Result of merging hooks: the updated settings and count of preserved groups.
+struct MergeResult {
+    settings: serde_json::Value,
+    preserved: usize,
+}
+
+/// Build the youwhatknow hook entries for a given port.
+fn build_hooks_value(port: u16) -> serde_json::Value {
+    serde_json::json!({
+        "SessionStart": [{
+            "hooks": [{
+                "type": "command",
+                "command": "youwhatknow init",
+                "timeout": 30
+            }]
+        }],
+        "PreToolUse": [{
+            "matcher": "Read",
+            "hooks": [{
+                "type": "http",
+                "url": format!("http://localhost:{port}/hook/pre-read"),
+                "timeout": 5
+            }]
+        }]
+    })
+}
+
+/// Returns true if a hook group contains any youwhatknow hook.
+fn is_youwhatknow_group(group: &serde_json::Value) -> bool {
+    let Some(hooks) = group.get("hooks").and_then(|h| h.as_array()) else {
+        return false;
+    };
+    hooks.iter().any(|hook| {
+        let cmd = hook.get("command").and_then(|v| v.as_str()).unwrap_or("");
+        let url = hook.get("url").and_then(|v| v.as_str()).unwrap_or("");
+        cmd.contains("youwhatknow") || url.contains("youwhatknow") || url.contains("/hook/pre-read")
+    })
+}
+
+/// Merge youwhatknow hooks into existing settings JSON.
+/// Removes old youwhatknow entries, appends new ones, preserves everything else.
+fn merge_hooks(mut settings: serde_json::Value, port: u16) -> MergeResult {
+    let our_hooks = build_hooks_value(port);
+    let mut preserved = 0;
+
+    let hooks = settings
+        .as_object_mut()
+        .expect("settings must be an object")
+        .entry("hooks")
+        .or_insert_with(|| serde_json::json!({}));
+
+    let hooks_obj = hooks.as_object_mut().expect("hooks must be an object");
+
+    for event_name in ["SessionStart", "PreToolUse"] {
+        let existing: Vec<serde_json::Value> = hooks_obj
+            .get(event_name)
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+
+        // Keep non-youwhatknow entries
+        let mut filtered: Vec<serde_json::Value> = existing
+            .into_iter()
+            .filter(|group| !is_youwhatknow_group(group))
+            .collect();
+
+        preserved += filtered.len();
+
+        // Append our entries
+        if let Some(our_entries) = our_hooks.get(event_name).and_then(|v| v.as_array()) {
+            filtered.extend(our_entries.iter().cloned());
+        }
+
+        hooks_obj.insert(event_name.to_owned(), serde_json::Value::Array(filtered));
+    }
+
+    MergeResult { settings, preserved }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -174,5 +253,114 @@ mod tests {
         write_env_file(path, "sess-123").expect("write");
         let content = std::fs::read_to_string(path).expect("read");
         assert!(content.contains("YOUWHATKNOW_SESSION=sess-123"));
+    }
+
+    #[test]
+    fn merge_hooks_empty_settings() {
+        let existing = serde_json::json!({});
+        let MergeResult { settings, preserved } = merge_hooks(existing, 7849);
+        let hooks = settings.get("hooks").expect("hooks key");
+        let session_start = hooks.get("SessionStart").expect("SessionStart");
+        assert!(session_start.is_array());
+        assert_eq!(session_start.as_array().unwrap().len(), 1);
+        let pre_tool = hooks.get("PreToolUse").expect("PreToolUse");
+        assert!(pre_tool.is_array());
+        assert_eq!(pre_tool.as_array().unwrap().len(), 1);
+        assert_eq!(preserved, 0);
+    }
+
+    #[test]
+    fn merge_hooks_preserves_other_hooks() {
+        let existing = serde_json::json!({
+            "hooks": {
+                "SessionStart": [{
+                    "hooks": [{
+                        "type": "command",
+                        "command": "my-linter check",
+                        "timeout": 10
+                    }]
+                }],
+                "PreToolUse": [{
+                    "matcher": "Write",
+                    "hooks": [{
+                        "type": "command",
+                        "command": "my-formatter",
+                        "timeout": 5
+                    }]
+                }]
+            }
+        });
+        let MergeResult { settings, preserved } = merge_hooks(existing, 7849);
+        let hooks = &settings["hooks"];
+        // Our hooks + the existing one
+        assert_eq!(hooks["SessionStart"].as_array().unwrap().len(), 2);
+        // PreToolUse: existing Write matcher + our Read matcher
+        assert_eq!(hooks["PreToolUse"].as_array().unwrap().len(), 2);
+        // Verify existing hooks are preserved
+        let first_ss = &hooks["SessionStart"][0];
+        assert_eq!(first_ss["hooks"][0]["command"], "my-linter check");
+        assert_eq!(preserved, 2);
+    }
+
+    #[test]
+    fn merge_hooks_replaces_existing_youwhatknow() {
+        let existing = serde_json::json!({
+            "hooks": {
+                "SessionStart": [
+                    {
+                        "hooks": [{
+                            "type": "command",
+                            "command": "youwhatknow init",
+                            "timeout": 30
+                        }]
+                    },
+                    {
+                        "hooks": [{
+                            "type": "command",
+                            "command": "other-tool start",
+                            "timeout": 10
+                        }]
+                    }
+                ],
+                "PreToolUse": [{
+                    "matcher": "Read",
+                    "hooks": [{
+                        "type": "http",
+                        "url": "http://localhost:7849/hook/pre-read",
+                        "timeout": 5
+                    }]
+                }]
+            }
+        });
+        let MergeResult { settings, preserved } = merge_hooks(existing, 7849);
+        let hooks = &settings["hooks"];
+        // other-tool preserved + our new one = 2
+        assert_eq!(hooks["SessionStart"].as_array().unwrap().len(), 2);
+        // Old youwhatknow replaced, so still 1
+        assert_eq!(hooks["PreToolUse"].as_array().unwrap().len(), 1);
+        assert_eq!(preserved, 1);
+    }
+
+    #[test]
+    fn merge_hooks_preserves_non_hook_settings() {
+        let existing = serde_json::json!({
+            "permissions": { "allow": ["Read"] },
+            "hooks": {}
+        });
+        let MergeResult { settings, .. } = merge_hooks(existing, 7849);
+        assert_eq!(settings["permissions"]["allow"][0], "Read");
+    }
+
+    #[test]
+    fn merge_hooks_group_without_hooks_array_preserved() {
+        let existing = serde_json::json!({
+            "hooks": {
+                "SessionStart": [{ "matcher": "odd-entry" }]
+            }
+        });
+        let MergeResult { settings, preserved } = merge_hooks(existing, 7849);
+        // Odd entry preserved + our entry = 2
+        assert_eq!(settings["hooks"]["SessionStart"].as_array().unwrap().len(), 2);
+        assert_eq!(preserved, 1);
     }
 }
