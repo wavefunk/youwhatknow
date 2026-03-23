@@ -44,11 +44,6 @@ pub fn analyze_file(path: &Path, source: &[u8]) -> FileAnalysis {
     }
 }
 
-/// Thin wrapper so callers that only need symbols still work.
-pub fn extract_symbols(path: &Path, source: &[u8]) -> Vec<String> {
-    analyze_file(path, source).symbols
-}
-
 // ── Rust analysis (single parse, two extractions) ──
 
 fn analyze_rust(source: &[u8], line_count: u32) -> FileAnalysis {
@@ -407,7 +402,7 @@ pub trait Baz {}
 pub type Alias = u32;
 struct Hidden;
 "#;
-        let symbols = extract_symbols(Path::new("lib.rs"), source);
+        let symbols = analyze_file(Path::new("lib.rs"), source).symbols;
         assert_eq!(symbols, vec!["hello", "Foo", "Bar", "Baz", "Alias"]);
     }
 
@@ -418,7 +413,7 @@ fn private() {}
 struct Hidden;
 enum Secret { X }
 "#;
-        let symbols = extract_symbols(Path::new("lib.rs"), source);
+        let symbols = analyze_file(Path::new("lib.rs"), source).symbols;
         assert!(symbols.is_empty());
     }
 
@@ -432,7 +427,7 @@ export type ID = string;
 export const VERSION = "1.0";
 function internal() {}
 "#;
-        let symbols = extract_symbols(Path::new("index.ts"), source);
+        let symbols = analyze_file(Path::new("index.ts"), source).symbols;
         assert!(symbols.contains(&"greet".to_owned()));
         assert!(symbols.contains(&"UserService".to_owned()));
         assert!(symbols.contains(&"Config".to_owned()));
@@ -454,7 +449,7 @@ class MyClass:
 def world():
     pass
 "#;
-        let symbols = extract_symbols(Path::new("mod.py"), source);
+        let symbols = analyze_file(Path::new("mod.py"), source).symbols;
         assert_eq!(symbols, vec!["hello", "MyClass", "world"]);
     }
 
@@ -472,7 +467,7 @@ type internal struct {}
 func (c *Config) Method() {}
 func (c *Config) helper() {}
 "#;
-        let symbols = extract_symbols(Path::new("main.go"), source);
+        let symbols = analyze_file(Path::new("main.go"), source).symbols;
         assert!(symbols.contains(&"Hello".to_owned()));
         assert!(symbols.contains(&"Config".to_owned()));
         assert!(symbols.contains(&"Method".to_owned()));
@@ -483,7 +478,7 @@ func (c *Config) helper() {}
 
     #[test]
     fn unknown_extension_returns_empty() {
-        let symbols = extract_symbols(Path::new("data.csv"), b"a,b,c");
+        let symbols = analyze_file(Path::new("data.csv"), b"a,b,c").symbols;
         assert!(symbols.is_empty());
     }
 
