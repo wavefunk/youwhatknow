@@ -13,7 +13,7 @@ use crate::hooks;
 use crate::registry::ProjectRegistry;
 use crate::session::SessionTracker;
 use crate::summary;
-use crate::types::{HealthResponse, HookRequest, HookResponse, StatusResponse, SummaryRequest};
+use crate::types::{HealthResponse, HookRequest, HookResponse, ResetRequest, StatusResponse, SummaryRequest};
 
 /// Tracks when the last request was received for idle shutdown.
 #[derive(Clone)]
@@ -81,6 +81,7 @@ pub fn router(state: AppState) -> Router {
         .route("/hook/pre-read", post(pre_read_handler))
         .route("/hook/session-start", post(session_start_handler))
         .route("/hook/summary", post(summary_handler))
+        .route("/hook/reset-read", post(reset_read_handler))
         .route("/reindex", post(reindex_handler))
         .route("/health", get(health_handler))
         .route("/status", get(status_handler))
@@ -168,11 +169,39 @@ async fn summary_handler(
     summary::render_file_summary(&file_summary, &config)
 }
 
+async fn reset_read_handler(
+    State(state): State<AppState>,
+    Json(request): Json<ResetRequest>,
+) -> (StatusCode, String) {
+    state.activity.touch();
+
+    let Some(session_id) = &request.session_id else {
+        return (
+            StatusCode::BAD_REQUEST,
+            "session_id required for reset".to_owned(),
+        );
+    };
+
+    let abs_path = request.cwd.join(&request.file_path);
+    let was_reset = state.session.reset_read(session_id, &abs_path).await;
+
+    let display_path = request.file_path.display();
+    if was_reset {
+        (StatusCode::OK, format!("reset {display_path}"))
+    } else {
+        (
+            StatusCode::OK,
+            format!("no read count to reset for {display_path}"),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use axum::body::Body;
     use http::Request;
+    use std::path::Path;
     use tower::ServiceExt;
 
     fn test_state() -> AppState {
@@ -303,8 +332,6 @@ mod tests {
 
     #[tokio::test]
     async fn summary_endpoint_returns_text() {
-        use std::path::Path;
-
         let state = test_state();
         let (index, _) = state
             .registry
@@ -370,5 +397,91 @@ mod tests {
             .expect("body");
         let text = String::from_utf8(body.to_vec()).expect("utf8");
         assert!(text.contains("reindex"));
+    }
+
+    #[tokio::test]
+    async fn reset_read_endpoint_without_session() {
+        let app = router(test_state());
+
+        let body = serde_json::json!({
+            "cwd": "/tmp/test-project",
+            "file_path": "src/main.rs"
+        });
+
+        let req = Request::builder()
+            .uri("/hook/reset-read")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_string(&body).expect("json")))
+            .expect("request");
+
+        let resp = app.oneshot(req).await.expect("response");
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn reset_read_endpoint_success() {
+        let state = test_state();
+
+        // Track a read first
+        state
+            .session
+            .track_read("test-session", Path::new("/tmp/test-project/src/main.rs"), 40)
+            .await;
+        state
+            .session
+            .track_read("test-session", Path::new("/tmp/test-project/src/main.rs"), 40)
+            .await;
+
+        let app = router(state);
+
+        let body = serde_json::json!({
+            "session_id": "test-session",
+            "cwd": "/tmp/test-project",
+            "file_path": "src/main.rs"
+        });
+
+        let req = Request::builder()
+            .uri("/hook/reset-read")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_string(&body).expect("json")))
+            .expect("request");
+
+        let resp = app.oneshot(req).await.expect("response");
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), 4096)
+            .await
+            .expect("body");
+        let text = String::from_utf8(body.to_vec()).expect("utf8");
+        assert!(text.contains("reset"));
+    }
+
+    #[tokio::test]
+    async fn reset_read_endpoint_nothing_to_reset() {
+        let app = router(test_state());
+
+        let body = serde_json::json!({
+            "session_id": "test-session",
+            "cwd": "/tmp/test-project",
+            "file_path": "src/never_read.rs"
+        });
+
+        let req = Request::builder()
+            .uri("/hook/reset-read")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_string(&body).expect("json")))
+            .expect("request");
+
+        let resp = app.oneshot(req).await.expect("response");
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), 4096)
+            .await
+            .expect("body");
+        let text = String::from_utf8(body.to_vec()).expect("utf8");
+        assert!(text.contains("no read count"));
     }
 }

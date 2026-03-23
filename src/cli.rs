@@ -103,6 +103,57 @@ pub fn summary(file_path: &str) -> eyre::Result<()> {
     Ok(())
 }
 
+/// Handle the `reset` subcommand: reset read count for a file.
+pub fn reset(file_path: &str, session_override: Option<&str>) -> eyre::Result<()> {
+    let session_id = match session_override {
+        Some(s) => s.to_owned(),
+        None => match std::env::var("YOUWHATKNOW_SESSION") {
+            Ok(s) if !s.is_empty() => s,
+            _ => {
+                eprintln!("error: no session available (set $YOUWHATKNOW_SESSION or use --session)");
+                std::process::exit(1);
+            }
+        },
+    };
+
+    let config = Config::load()?;
+    let base_url = format!("http://127.0.0.1:{}", config.port);
+
+    // Ensure daemon is running
+    if !daemon_is_running(&base_url) {
+        spawn_daemon()?;
+        wait_for_daemon(&base_url)?;
+    }
+
+    let cwd = std::env::current_dir()?;
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()?;
+
+    let body = serde_json::json!({
+        "session_id": session_id,
+        "cwd": cwd,
+        "file_path": file_path,
+    });
+
+    let resp = client
+        .post(format!("{base_url}/hook/reset-read"))
+        .header("content-type", "application/json")
+        .body(serde_json::to_string(&body)?)
+        .send()?;
+
+    let status = resp.status();
+    let text = resp.text()?;
+
+    if !status.is_success() {
+        eyre::bail!("daemon returned {status}: {text}");
+    }
+
+    println!("{text}");
+    Ok(())
+}
+
 /// Handle the `status` subcommand: query daemon and display status.
 pub fn status() -> eyre::Result<()> {
     let config = Config::load()?;

@@ -158,6 +158,16 @@ pub struct SummaryRequest {
     pub file_path: PathBuf,
 }
 
+// ── Reset request (CLI → daemon) ──
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ResetRequest {
+    #[serde(default, alias = "sessionId")]
+    pub session_id: Option<String>,
+    pub cwd: PathBuf,
+    pub file_path: PathBuf,
+}
+
 // ── Health check ──
 
 #[derive(Debug, Serialize, Deserialize)]
