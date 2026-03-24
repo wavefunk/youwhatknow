@@ -1,6 +1,6 @@
 [package]
 name = "youwhatknow"
-version = "0.0.1"
+version = "0.1.0"
 authors = ["wavefunk"]
 description = "Claude Code hook server that injects file summaries before reads and tracks repeat reads per session"
 edition = "2024"

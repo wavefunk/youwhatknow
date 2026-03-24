@@ -148,17 +148,17 @@
                     <div class="arch-box secondary">Claude Session B</div>
                     <div class="arch-box secondary">Subagent</div>
                 </div>
-                <div class="arch-arrow">&darr; HTTP hooks &darr;</div>
+                <div class="arch-arrow-down">&darr; HTTP hooks &darr;</div>
                 <div class="arch-row">
                     <div class="arch-box primary">youwhatknow &mdash; localhost:7849</div>
                 </div>
-                <div class="arch-arrow">&darr; routes by cwd &darr;</div>
+                <div class="arch-arrow-down">&darr; routes by cwd &darr;</div>
                 <div class="arch-row">
                     <div class="arch-box secondary">Project A Index</div>
                     <div class="arch-box secondary">Project B Index</div>
                     <div class="arch-box secondary">Project C Index</div>
                 </div>
-                <div class="arch-arrow">&darr;</div>
+                <div class="arch-arrow-down">&darr;</div>
                 <div class="arch-row">
                     <div class="arch-box secondary">tree-sitter &bull; haiku descriptions &bull; TOML</div>
                 </div>
@@ -366,18 +366,6 @@ idle_shutdown_minutes = 30</code></pre>
     }
 
     setTimeout(addLine, 1000);
-
-    var observer = new IntersectionObserver(function(entries) {
-        entries.forEach(function(entry) {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('visible');
-            }
-        });
-    }, { threshold: 0.15 });
-
-    document.querySelectorAll('.reveal').forEach(function(el) {
-        observer.observe(el);
-    });
 })();
     </script>
 
