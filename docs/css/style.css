@@ -90,6 +90,8 @@ nav .container {
     font-size: 12px;
 }
 
+.nav-links a.active { color: #fff; }
+
 /* ── 6. Section labels ── */
 .section-label {
     font-size: 10px;
