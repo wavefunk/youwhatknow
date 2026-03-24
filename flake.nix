@@ -57,7 +57,7 @@
               baseName == "build.rs" ||
               pkgs.lib.hasSuffix ".rs" baseName;
           };
-          cargoHash = "sha256-l4mUMRlhlzWohy/YlUbCGxDLu9UxI5Yn4fON92yvo9E=";
+          cargoHash = "sha256-8D7biK811LUOjuKQMVcIKzTmIKKsRG9yB/ol1ncIiOs=";
 
           nativeBuildInputs = with pkgs; [
             pkg-config
