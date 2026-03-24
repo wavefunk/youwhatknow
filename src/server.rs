@@ -13,7 +13,7 @@ use crate::hooks;
 use crate::registry::ProjectRegistry;
 use crate::session::SessionTracker;
 use crate::summary;
-use crate::types::{HealthResponse, HookRequest, HookResponse, ResetRequest, StatusResponse, SummaryRequest};
+use crate::types::{HealthResponse, HookRequest, HookResponse, ReindexRequest, ResetRequest, StatusResponse, SummaryRequest};
 
 /// Tracks when the last request was received for idle shutdown.
 #[derive(Clone)]
@@ -111,10 +111,10 @@ async fn session_start_handler(
 
 async fn reindex_handler(
     State(state): State<AppState>,
-    Json(request): Json<HookRequest>,
+    Json(request): Json<ReindexRequest>,
 ) -> StatusCode {
     state.activity.touch();
-    state.registry.reindex(&request.cwd).await;
+    state.registry.reindex(&request.cwd, request.full).await;
     StatusCode::ACCEPTED
 }
 
@@ -456,6 +456,45 @@ mod tests {
             .expect("body");
         let text = String::from_utf8(body.to_vec()).expect("utf8");
         assert!(text.contains("reset"));
+    }
+
+    #[tokio::test]
+    async fn reindex_endpoint_accepts_minimal_request() {
+        let app = router(test_state());
+
+        let body = serde_json::json!({
+            "cwd": "/tmp/test-project"
+        });
+
+        let req = Request::builder()
+            .uri("/reindex")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_string(&body).expect("json")))
+            .expect("request");
+
+        let resp = app.oneshot(req).await.expect("response");
+        assert_eq!(resp.status(), StatusCode::ACCEPTED);
+    }
+
+    #[tokio::test]
+    async fn reindex_endpoint_accepts_full_flag() {
+        let app = router(test_state());
+
+        let body = serde_json::json!({
+            "cwd": "/tmp/test-project",
+            "full": true
+        });
+
+        let req = Request::builder()
+            .uri("/reindex")
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_string(&body).expect("json")))
+            .expect("request");
+
+        let resp = app.oneshot(req).await.expect("response");
+        assert_eq!(resp.status(), StatusCode::ACCEPTED);
     }
 
     #[tokio::test]

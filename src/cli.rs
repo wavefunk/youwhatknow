@@ -251,9 +251,8 @@ pub fn setup(shared: bool, no_index: bool) -> eyre::Result<()> {
             .post(format!("{base_url}/reindex"))
             .header("content-type", "application/json")
             .body(serde_json::to_string(&serde_json::json!({
-                "session_id": "setup",
                 "cwd": cwd,
-                "hook_event_name": "Setup"
+                "full": true
             }))?)
             .send()?;
 

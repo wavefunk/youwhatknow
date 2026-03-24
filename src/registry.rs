@@ -157,12 +157,17 @@ impl ProjectRegistry {
         self.inner.read().await.projects.len()
     }
 
-    /// Trigger a full re-index for a specific project.
-    pub async fn reindex(&self, project_root: &Path) {
+    /// Trigger a re-index for a specific project.
+    /// Defaults to incremental; pass `full = true` to force a complete rebuild.
+    pub async fn reindex(&self, project_root: &Path, full: bool) {
         let (index, config) = self.get_or_load(project_root).await;
         let root = project_root.to_path_buf();
         tokio::spawn(async move {
-            index.full_index(&root, &config).await;
+            if full {
+                index.full_index(&root, &config).await;
+            } else {
+                index.incremental_index(&root, &config).await;
+            }
         });
     }
 }

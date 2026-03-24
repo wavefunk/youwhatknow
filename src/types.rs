@@ -168,6 +168,15 @@ pub struct ResetRequest {
     pub file_path: PathBuf,
 }
 
+// ── Reindex request ──
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ReindexRequest {
+    pub cwd: PathBuf,
+    #[serde(default)]
+    pub full: bool,
+}
+
 // ── Health check ──
 
 #[derive(Debug, Serialize, Deserialize)]

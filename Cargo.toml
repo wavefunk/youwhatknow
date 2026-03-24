@@ -4,6 +4,7 @@ version = "0.0.1"
 authors = ["wavefunk"]
 description = "Claude Code hook server that injects file summaries before reads and tracks repeat reads per session"
 edition = "2024"
+repository = "https://github.com/wavefunk/youwhatknow"
 
 [[bin]]
 name = "youwhatknow"
@@ -39,3 +40,8 @@ reqwest = { version = "0.12", features = ["blocking", "json"] }
 
 [profile.dev]
 incremental = true
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
