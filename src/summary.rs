@@ -57,7 +57,8 @@ pub fn render_session_instructions(config: &ProjectConfig) -> String {
     format!(
         "Files over {} lines show a summary on first read. \
          Read again for the full file, or use offset/limit to target specific sections.\n\
-         To preview any file without triggering a read: run `youwhatknow summary <path>` in the terminal.",
+         To preview any file without triggering a read: run `youwhatknow summary <path>` in the terminal.\n\
+         Run `youwhatknow prime` for full workflow context, troubleshooting, and all available commands.",
         config.line_threshold
     )
 }
@@ -195,6 +196,7 @@ mod tests {
         let instructions = render_session_instructions(&config);
         assert!(instructions.contains("30 lines"));
         assert!(instructions.contains("youwhatknow summary"));
+        assert!(instructions.contains("youwhatknow prime"));
         assert!(instructions.contains("offset/limit"));
     }
 
