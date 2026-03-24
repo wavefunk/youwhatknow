@@ -193,6 +193,102 @@ pub fn status() -> eyre::Result<()> {
     Ok(())
 }
 
+/// Handle the `logs` subcommand: show daemon log output.
+pub fn logs(follow: bool, lines: usize) -> eyre::Result<()> {
+    let log_path = crate::config::data_dir().join("daemon.log");
+
+    if !log_path.exists() {
+        eprintln!("no log file found at {}", log_path.display());
+        eprintln!("daemon may not have been started yet");
+        std::process::exit(1);
+    }
+
+    if follow {
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            let err = std::process::Command::new("tail")
+                .args(["-f", "-n"])
+                .arg(lines.to_string())
+                .arg(&log_path)
+                .exec();
+            // exec only returns on error
+            eyre::bail!("failed to exec tail: {err}");
+        }
+        #[cfg(not(unix))]
+        {
+            eyre::bail!("--follow is only supported on Unix");
+        }
+    }
+
+    let content = std::fs::read_to_string(&log_path)?;
+    let all_lines: Vec<&str> = content.lines().collect();
+    let start = all_lines.len().saturating_sub(lines);
+    for line in &all_lines[start..] {
+        println!("{line}");
+    }
+
+    Ok(())
+}
+
+/// Handle the `restart` subcommand: stop and restart the daemon.
+pub fn restart() -> eyre::Result<()> {
+    let config = Config::load()?;
+    let base_url = format!("http://127.0.0.1:{}", config.port);
+
+    if daemon_is_running(&base_url) {
+        eprintln!("Stopping daemon...");
+        stop_daemon()?;
+
+        // Wait for the daemon to actually stop
+        let start = Instant::now();
+        let timeout = Duration::from_secs(10);
+        while start.elapsed() < timeout {
+            if !daemon_is_running(&base_url) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+
+        if daemon_is_running(&base_url) {
+            eyre::bail!("daemon did not stop within {}s", timeout.as_secs());
+        }
+    } else {
+        eprintln!("Daemon is not running.");
+    }
+
+    eprintln!("Starting daemon...");
+    spawn_daemon()?;
+    wait_for_daemon(&base_url)?;
+    eprintln!("Daemon restarted.");
+    Ok(())
+}
+
+/// Stop the daemon by sending SIGTERM to the PID in the pid file.
+fn stop_daemon() -> eyre::Result<()> {
+    let pid_path = crate::config::data_dir().join("youwhatknow.pid");
+    if !pid_path.exists() {
+        eyre::bail!("no PID file found");
+    }
+
+    let pid_str = std::fs::read_to_string(&pid_path)?;
+    let pid: u32 = pid_str
+        .trim()
+        .parse()
+        .map_err(|e| eyre::eyre!("invalid PID in {}: {e}", pid_path.display()))?;
+
+    let status = std::process::Command::new("kill")
+        .arg(pid.to_string())
+        .status()?;
+
+    if !status.success() {
+        // Exit code 1 from kill usually means process already gone
+        eprintln!("warning: kill exited with {status}");
+    }
+
+    Ok(())
+}
+
 /// Handle the `setup` subcommand: configure hooks and optionally trigger indexing.
 pub fn setup(shared: bool, no_index: bool) -> eyre::Result<()> {
     let cwd = std::env::current_dir()?;
@@ -579,6 +675,30 @@ mod tests {
         });
         let MergeResult { settings, .. } = merge_hooks(existing, 7849);
         assert_eq!(settings["permissions"]["allow"][0], "Read");
+    }
+
+    #[test]
+    fn logs_tails_last_n_lines() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let log = tmp.path().join("daemon.log");
+        std::fs::write(&log, "line1\nline2\nline3\nline4\nline5\n").expect("write");
+
+        let content = std::fs::read_to_string(&log).expect("read");
+        let all_lines: Vec<&str> = content.lines().collect();
+        let start = all_lines.len().saturating_sub(3);
+        let tailed: Vec<&str> = all_lines[start..].to_vec();
+
+        assert_eq!(tailed, vec!["line3", "line4", "line5"]);
+    }
+
+    #[test]
+    fn logs_fewer_lines_than_requested() {
+        let content = "line1\nline2\n";
+        let all_lines: Vec<&str> = content.lines().collect();
+        let start = all_lines.len().saturating_sub(50);
+        let tailed: Vec<&str> = all_lines[start..].to_vec();
+
+        assert_eq!(tailed, vec!["line1", "line2"]);
     }
 
     #[test]

@@ -45,6 +45,17 @@ enum Command {
     },
     /// Show daemon status
     Status,
+    /// Show daemon logs
+    Logs {
+        /// Follow log output (like tail -f)
+        #[arg(short, long)]
+        follow: bool,
+        /// Number of lines to show (default: 50)
+        #[arg(short = 'n', long, default_value_t = 50)]
+        lines: usize,
+    },
+    /// Restart the daemon
+    Restart,
     /// Reset read count for a file (shows summary again on next read)
     Reset {
         /// File path relative to cwd
@@ -71,6 +82,8 @@ fn main() -> eyre::Result<()> {
             cli::setup(shared, no_index)
         }
         Some(Command::Status) => cli::status(),
+        Some(Command::Logs { follow, lines }) => cli::logs(follow, lines),
+        Some(Command::Restart) => cli::restart(),
         Some(Command::Reset { path, session }) => cli::reset(&path, session.as_deref()),
         Some(Command::Serve) | None => {
             tracing_subscriber::fmt()
