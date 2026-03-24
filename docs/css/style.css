@@ -44,7 +44,7 @@ body::after {
     z-index: 9999;
 }
 
-body::before {
+body.landing::before {
     content: '';
     position: fixed;
     inset: 0;
@@ -61,6 +61,7 @@ a:hover { text-decoration: underline; }
 .container { max-width: 900px; margin: 0 auto; padding: 0 2rem; }
 .muted { color: var(--text-dim); max-width: 600px; }
 .muted strong { color: var(--text); font-weight: 500; }
+section { padding: 5rem 0; }
 
 /* ── 5. Nav ── */
 nav {
@@ -649,6 +650,11 @@ h3 {
 }
 
 /* ── 18. Docs-specific ── */
+body.docs .container { max-width: 800px; }
+body.docs h2 { font-size: clamp(1.5rem, 3vw, 2rem); margin-bottom: 1rem; line-height: 1.3; }
+body.docs h3 { margin: 2rem 0 0.75rem; }
+body.docs .footer-logo { font-size: 1.25rem; }
+
 .page-header {
     margin-bottom: 4rem;
 }
