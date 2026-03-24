@@ -221,6 +221,12 @@ h3 {
     box-shadow: 0 0 30px var(--glow-dim);
 }
 
+.hero-logo {
+    filter: drop-shadow(0 0 40px rgba(57, 255, 133, 0.3));
+    animation: fadeSlideUp 0.8s ease 0.2s both;
+    margin-bottom: 2rem;
+}
+
 /* ── 9. Terminal ── */
 .terminal-section {
     padding: 3rem 0 6rem;
@@ -785,6 +791,10 @@ footer p { font-size: 12px; color: var(--text-dim); }
     color: var(--text-dim);
     margin-top: 1rem;
 }
+
+.footer-links { margin-bottom: 0.75rem; }
+.footer-links a { font-size: 12px; }
+.footer-links a + a { margin-left: 1.5rem; }
 
 /* ── 20. Animations ── */
 @keyframes fadeSlideUp {
