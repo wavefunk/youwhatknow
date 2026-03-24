@@ -7,873 +7,314 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Mono:wght@400;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg: #0a0a0c;
-            --bg-card: #111114;
-            --glow: #39ff85;
-            --glow-dim: #39ff8533;
-            --glow-mid: #39ff8566;
-            --amber: #ffb830;
-            --amber-dim: #ffb83033;
-            --red: #ff4f4f;
-            --text: #c8c8d0;
-            --text-dim: #5a5a6e;
-            --border: #1e1e28;
-            --mono: 'JetBrains Mono', 'Courier New', monospace;
-            --display: 'Space Mono', monospace;
-            --serif: 'Instrument Serif', Georgia, serif;
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        html { scroll-behavior: smooth; }
-
-        body {
-            background: var(--bg);
-            color: var(--text);
-            font-family: var(--mono);
-            font-size: 15px;
-            line-height: 1.7;
-            overflow-x: hidden;
-        }
-
-        body::after {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
-            pointer-events: none;
-            z-index: 9999;
-        }
-
-        body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            opacity: 0.035;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-            background-size: 128px;
-            pointer-events: none;
-            z-index: 9998;
-        }
-
-        a { color: var(--glow); text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .container { max-width: 900px; margin: 0 auto; padding: 0 2rem; }
-
-        /* ── Hero ── */
-        .hero {
-            padding: 8rem 0 4rem;
-            text-align: center;
-        }
-
-        .hero-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.15em;
-            color: var(--glow);
-            border: 1px solid var(--glow-dim);
-            padding: 0.4rem 1rem;
-            border-radius: 2px;
-            margin-bottom: 2.5rem;
-            background: var(--glow-dim);
-            animation: fadeSlideUp 0.8s ease both;
-        }
-
-        .hero-badge-dot {
-            width: 6px; height: 6px;
-            background: var(--glow);
-            border-radius: 50%;
-            display: inline-block;
-            animation: pulse 2s ease-in-out infinite;
-        }
-
-        .hero h1 {
-            font-family: var(--serif);
-            font-size: clamp(3.5rem, 9vw, 7rem);
-            font-weight: 400;
-            font-style: italic;
-            line-height: 1;
-            color: #fff;
-            margin-bottom: 0.5em;
-            animation: fadeSlideUp 0.8s ease 0.1s both;
-        }
-
-        .hero h1 em {
-            font-style: normal;
-            color: var(--glow);
-            text-shadow: 0 0 40px var(--glow-dim), 0 0 80px var(--glow-dim);
-        }
-
-        .hero-tagline {
-            font-family: var(--serif);
-            font-size: clamp(1.2rem, 2.5vw, 1.6rem);
-            font-style: italic;
-            color: var(--text-dim);
-            margin-bottom: 1rem;
-            animation: fadeSlideUp 0.8s ease 0.15s both;
-        }
-
-        .hero-sub {
-            font-size: 0.95rem;
-            color: var(--text-dim);
-            max-width: 560px;
-            margin: 0 auto 3rem;
-            line-height: 1.8;
-            animation: fadeSlideUp 0.8s ease 0.2s both;
-        }
-
-        .hero-sub strong { color: var(--text); font-weight: 500; }
-
-        .hero-cta {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.75rem;
-            background: var(--glow);
-            color: var(--bg);
-            font-family: var(--mono);
-            font-size: 13px;
-            font-weight: 700;
-            padding: 0.85rem 2rem;
-            border: none;
-            cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            transition: all 0.2s;
-            animation: fadeSlideUp 0.8s ease 0.3s both;
-            text-decoration: none;
-        }
-
-        .hero-cta:hover {
-            background: #fff;
-            text-decoration: none;
-            box-shadow: 0 0 30px var(--glow-dim);
-        }
-
-        /* ── Terminal ── */
-        .terminal-section {
-            padding: 3rem 0 6rem;
-            animation: fadeSlideUp 1s ease 0.5s both;
-        }
-
-        .terminal-label {
-            text-align: center;
-            font-size: 12px;
-            color: var(--text-dim);
-            margin-bottom: 1.5rem;
-            font-style: italic;
-        }
-
-        .terminal {
-            background: #0d0d12;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            overflow: hidden;
-            font-size: 12px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-            max-width: 650px;
-            margin: 0 auto;
-        }
-
-        .terminal-bar {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 10px 14px;
-            background: #161620;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .terminal-dot { width: 10px; height: 10px; border-radius: 50%; }
-        .terminal-dot.r { background: #ff5f57; }
-        .terminal-dot.y { background: #febc2e; }
-        .terminal-dot.g { background: #28c840; }
-
-        .terminal-bar-title {
-            margin-left: auto;
-            font-size: 10px;
-            color: var(--text-dim);
-        }
-
-        .terminal-body {
-            padding: 16px;
-            min-height: 320px;
-        }
-
-        .term-line {
-            margin-bottom: 2px;
-            opacity: 0;
-            animation: termFadeIn 0.15s ease forwards;
-            white-space: nowrap;
-        }
-
-        .t-prompt { color: var(--glow); }
-        .t-cmd { color: var(--text); }
-        .t-file { color: var(--amber); }
-        .t-warn { color: var(--red); }
-        .t-ok { color: var(--glow); }
-        .t-dim { color: var(--text-dim); }
-        .t-bold { font-weight: 700; }
-
-        .cursor-blink {
-            display: inline-block;
-            width: 7px; height: 14px;
-            background: var(--glow);
-            animation: blink 1s step-end infinite;
-            vertical-align: middle;
-            margin-left: 2px;
-        }
-
-        /* ── Sections ── */
-        section { padding: 5rem 0; }
-
-        .section-label {
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.2em;
-            color: var(--glow);
-            margin-bottom: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .section-label::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: var(--border);
-        }
-
-        h2 {
-            font-family: var(--serif);
-            font-size: clamp(2rem, 4vw, 3rem);
-            font-weight: 400;
-            font-style: italic;
-            color: #fff;
-            margin-bottom: 1.5rem;
-            line-height: 1.2;
-        }
-
-        .muted { color: var(--text-dim); max-width: 600px; }
-        .muted strong { color: var(--text); font-weight: 500; }
-
-        /* ── Conversation bubbles for the problem section ── */
-        .convo {
-            margin-top: 3rem;
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            max-width: 620px;
-        }
-
-        .bubble {
-            padding: 1rem 1.5rem;
-            border-radius: 4px;
-            font-size: 13.5px;
-            line-height: 1.6;
-            position: relative;
-            animation: fadeSlideUp 0.5s ease both;
-        }
-
-        .bubble-claude {
-            background: #161620;
-            border: 1px solid var(--border);
-            align-self: flex-start;
-            border-left: 3px solid var(--amber);
-        }
-
-        .bubble-you {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            align-self: flex-end;
-            border-right: 3px solid var(--red);
-            text-align: right;
-            font-style: italic;
-            color: var(--red);
-        }
-
-        .bubble-ywk {
-            background: #0d1a10;
-            border: 1px solid #1a3d1f;
-            align-self: flex-start;
-            border-left: 3px solid var(--glow);
-            color: var(--glow);
-        }
-
-        .bubble-who {
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-bottom: 0.3rem;
-            opacity: 0.6;
-        }
-
-        /* ── How it works ── */
-        .flow { display: grid; gap: 0; margin-top: 3rem; }
-
-        .flow-step {
-            display: grid;
-            grid-template-columns: 60px 1fr;
-            gap: 2rem;
-            padding: 2rem 0;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .flow-step:last-child { border-bottom: none; }
-
-        .flow-num {
-            font-family: var(--serif);
-            font-size: 2.5rem;
-            font-style: italic;
-            color: var(--glow);
-            line-height: 1;
-            text-shadow: 0 0 20px var(--glow-dim);
-        }
-
-        .flow-step h3 {
-            font-family: var(--display);
-            font-size: 14px;
-            color: #fff;
-            margin-bottom: 0.5rem;
-        }
-
-        .flow-step p { font-size: 13px; color: var(--text-dim); line-height: 1.7; }
-
-        .flow-step code {
-            display: inline-block;
-            background: var(--glow-dim);
-            color: var(--glow);
-            padding: 0.15em 0.5em;
-            font-size: 11px;
-            margin-top: 0.75rem;
-            border: 1px solid var(--glow-dim);
-        }
-
-        .flow-aside {
-            font-size: 12px;
-            color: var(--text-dim);
-            font-style: italic;
-            margin-top: 0.5rem;
-        }
-
-        /* ── Architecture ── */
-        .arch-diagram {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            padding: 3rem 2rem;
-            margin-top: 3rem;
-            border-top: 2px solid var(--glow);
-        }
-
-        .arch-row {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-            flex-wrap: wrap;
-        }
-
-        .arch-row:last-child { margin-bottom: 0; }
-
-        .arch-box {
-            padding: 0.75rem 1.5rem;
-            font-size: 11px;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            text-align: center;
-            border: 1px solid var(--border);
-            background: var(--bg);
-            min-width: 160px;
-        }
-
-        .arch-box.primary {
-            border-color: var(--glow-mid);
-            color: var(--glow);
-            box-shadow: 0 0 20px var(--glow-dim);
-        }
-
-        .arch-box.secondary { border-color: var(--amber-dim); color: var(--amber); }
-
-        .arch-arrow-down {
-            display: block;
-            text-align: center;
-            margin: 0.75rem 0;
-            color: var(--text-dim);
-            font-size: 13px;
-        }
-
-        /* ── Benefits ── */
-        .benefits-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1px;
-            background: var(--border);
-            margin-top: 3rem;
-            border: 1px solid var(--border);
-        }
-
-        .benefit { background: var(--bg-card); padding: 2.5rem 2rem; }
-        .benefit-icon { font-size: 1.5rem; margin-bottom: 1rem; display: block; }
-
-        .benefit h3 {
-            font-family: var(--display);
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #fff;
-            margin-bottom: 0.75rem;
-        }
-
-        .benefit p { font-size: 12.5px; color: var(--text-dim); line-height: 1.7; }
-
-        /* ── Setup ── */
-        .setup-block {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            margin-top: 2rem;
-            overflow: hidden;
-        }
-
-        .setup-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.75rem 1.25rem;
-            background: #161620;
-            border-bottom: 1px solid var(--border);
-            font-size: 11px;
-            color: var(--text-dim);
-        }
-
-        .setup-tag {
-            color: var(--glow);
-            background: var(--glow-dim);
-            padding: 0.2em 0.6em;
-            font-size: 10px;
-        }
-
-        .setup-code {
-            padding: 1.5rem;
-            font-size: 12.5px;
-            line-height: 1.8;
-            overflow-x: auto;
-            white-space: pre;
-            font-family: var(--mono);
-        }
-
-        .k { color: var(--amber); }
-        .s { color: var(--glow); }
-        .c { color: var(--text-dim); font-style: italic; }
-
-        /* ── Footer ── */
-        footer {
-            border-top: 1px solid var(--border);
-            padding: 3rem 0;
-            margin-top: 4rem;
-            text-align: center;
-        }
-
-        footer p { font-size: 12px; color: var(--text-dim); }
-
-        .footer-logo {
-            font-family: var(--serif);
-            font-style: italic;
-            font-size: 1.5rem;
-            color: #fff;
-            margin-bottom: 0.5rem;
-        }
-
-        .footer-quip {
-            font-family: var(--serif);
-            font-style: italic;
-            font-size: 14px;
-            color: var(--text-dim);
-            margin-top: 1rem;
-        }
-
-        /* ── Animations ── */
-        @keyframes fadeSlideUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
-        }
-
-        @keyframes termFadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0; }
-        }
-
-        .reveal {
-            opacity: 0;
-            transform: translateY(30px);
-            transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        .reveal.visible { opacity: 1; transform: translateY(0); }
-
-        @media (max-width: 900px) {
-            .benefits-grid { grid-template-columns: 1fr; }
-            .arch-row { flex-direction: column; }
-            .bubble-you { align-self: flex-start; text-align: left; }
-        }
-    </style>
+    <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body class="landing">
 
-<!-- ═══ HERO ═══ -->
-<section class="hero">
-    <div class="container">
-        <div class="hero-badge"><span class="hero-badge-dot"></span> A Claude Code intervention</div>
-        <img src="logo.svg" alt="!?" width="120" height="120" style="margin-bottom: 1.5rem; animation: fadeSlideUp 0.8s ease 0.05s both; filter: drop-shadow(0 0 30px rgba(57, 255, 133, 0.3));">
-        <h1><em>you what (k)now?</em></h1>
-        <p class="hero-tagline">"Wait, are you reading that file again?"</p>
-        <p class="hero-sub">
-            You know the look. Claude's halfway through a task and decides to read <strong>src/main.rs</strong> for the fifth time.
-            847 lines. Again. You stare at your token counter and whisper <strong>"you what now?"</strong>
-            <br><br>
-            This tool gently taps Claude on the shoulder and goes: <em>hey buddy, here's what's in that file. You sure you need the whole thing?</em>
-        </p>
-        <a href="#setup" class="hero-cta">Make it stop &#8594;</a>
-        <div style="margin-top: 1.5rem; animation: fadeSlideUp 0.8s ease 0.4s both;">
-            <a href="docs.html" style="font-size: 12px; margin-right: 2rem;">Docs</a>
-            <a href="https://github.com/wavefunk/youwhatknow" style="font-size: 12px;">GitHub</a>
+    <!-- ── HERO ── -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-badge">
+                <span class="hero-badge-dot"></span> A Claude Code hook server
+            </div>
+            <img src="logo.svg" alt="!?" width="120" height="120" style="filter: drop-shadow(0 0 40px rgba(57,255,133,0.3)); animation: fadeSlideUp 0.8s ease both; animation-delay: 0.2s; margin-bottom: 2rem;">
+            <h1><em>you what (k)now?</em></h1>
+            <p class="hero-tagline">"Wait, are you reading that file again?"</p>
+            <p class="hero-sub">You know the look. Claude's halfway through a task and decides to read <strong>src/main.rs</strong> for the fifth time. 847 lines. Again. You stare at your token counter and whisper <strong>"you what now?"</strong><br><br>Instead of 2000 lines of code, Claude gets a summary. If it still wants the full file, it has to ask twice.</p>
+            <a href="#setup" class="hero-cta">Make it stop &#8594;</a>
+            <div class="hero-links">
+                <a href="docs.html">Docs</a>
+                <a href="https://github.com/wavefunk/youwhatknow">GitHub</a>
+            </div>
         </div>
-    </div>
-</section>
+    </section>
 
-<!-- ═══ TERMINAL DEMO ═══ -->
-<div class="terminal-section">
-    <div class="container">
-        <p class="terminal-label">A typical Tuesday with Claude (dramatized only slightly)</p>
-        <div class="terminal">
-            <div class="terminal-bar">
-                <div class="terminal-dot r"></div>
-                <div class="terminal-dot y"></div>
-                <div class="terminal-dot g"></div>
-                <span class="terminal-bar-title">claude &mdash; very busy reading the same file</span>
-            </div>
-            <div class="terminal-body" id="terminal-demo"></div>
-        </div>
-    </div>
-</div>
-
-<!-- ═══ THE PROBLEM ═══ -->
-<section class="reveal">
-    <div class="container">
-        <div class="section-label">The problem, illustrated</div>
-        <h2>We need to talk about Claude's reading habits.</h2>
-        <p class="muted">
-            We love Claude. Claude is great. But Claude has a problem. It reads files like someone
-            who opens the fridge every 10 minutes hoping new food appeared.
-            It didn't. It's the same fridge. Same food. Same 847 lines of main.rs.
-        </p>
-
-        <div class="convo">
-            <div class="bubble bubble-claude">
-                <div class="bubble-who">Claude</div>
-                Let me read src/main.rs to understand the project structure.
-            </div>
-            <div class="bubble bubble-claude">
-                <div class="bubble-who">Claude (30 seconds later)</div>
-                I should check src/main.rs to see how the server starts.
-            </div>
-            <div class="bubble bubble-you">
-                <div class="bubble-who">You</div>
-                you literally just read that
-            </div>
-            <div class="bubble bubble-claude">
-                <div class="bubble-who">Claude (2 minutes later)</div>
-                Let me look at src/main.rs to verify the import paths.
-            </div>
-            <div class="bubble bubble-you">
-                <div class="bubble-who">You</div>
-                YOU WHAT NOW
-            </div>
-            <div class="bubble bubble-ywk">
-                <div class="bubble-who">youwhatknow</div>
-                Hey Claude &#8212; src/main.rs was already read 3x this session.<br>
-                Here's the summary: Entry point, server startup. Public: main().<br>
-                Do you still need the full file?
-            </div>
-            <div class="bubble bubble-claude">
-                <div class="bubble-who">Claude</div>
-                ...no, actually, I don't. Thanks.
+    <!-- ── TERMINAL DEMO ── -->
+    <div class="terminal-section">
+        <div class="container">
+            <p class="terminal-label">A typical Tuesday with Claude (dramatized only slightly)</p>
+            <div class="terminal">
+                <div class="terminal-bar">
+                    <div class="terminal-dot r"></div>
+                    <div class="terminal-dot y"></div>
+                    <div class="terminal-dot g"></div>
+                    <span class="terminal-bar-title">claude &mdash; very busy reading the same file</span>
+                </div>
+                <div class="terminal-body" id="terminal-demo"></div>
             </div>
         </div>
     </div>
-</section>
 
-<!-- ═══ HOW IT WORKS ═══ -->
-<section class="reveal">
-    <div class="container">
-        <div class="section-label">How it works</div>
-        <h2>A polite but firm intervention.</h2>
-        <p class="muted">
-            youwhatknow sits between Claude and the filesystem like a responsible friend at a buffet.
-            "You can have more if you want, but here's what's on your plate already."
-        </p>
+    <!-- ── THE PROBLEM ── -->
+    <section class="reveal">
+        <div class="container">
+            <div class="section-label">The problem, illustrated</div>
+            <h2>We need to talk about Claude's reading habits.</h2>
+            <p class="muted">We love Claude. Claude is great. But Claude has a problem. It reads files like someone who opens the fridge every 10 minutes hoping new food appeared.</p>
+            <div class="convo">
+                <div class="bubble bubble-claude">
+                    <div class="bubble-who">Claude</div>
+                    Let me read src/main.rs to understand the project structure.
+                </div>
+                <div class="bubble bubble-claude">
+                    <div class="bubble-who">Claude (30 seconds later)</div>
+                    I should check src/main.rs to see how the server starts.
+                </div>
+                <div class="bubble bubble-you">
+                    <div class="bubble-who">You</div>
+                    you literally just read that
+                </div>
+                <div class="bubble bubble-ywk">
+                    <div class="bubble-who">youwhatknow</div>
+                    denied. src/main.rs (847 lines) &mdash; Entry point, server startup. Public: main().<br>
+                    If this is enough, don't read the file. Read again if you need it.
+                </div>
+                <div class="bubble bubble-claude">
+                    <div class="bubble-who">Claude</div>
+                    ...okay, the summary is enough. Thanks.
+                </div>
+            </div>
+        </div>
+    </section>
 
-        <div class="flow">
-            <div class="flow-step">
-                <div class="flow-num">1</div>
-                <div>
+    <!-- ── HOW IT WORKS ── -->
+    <section class="reveal">
+        <div class="container">
+            <div class="section-label">How it works</div>
+            <h2>A polite but firm intervention.</h2>
+            <p class="muted">youwhatknow sits between Claude and the filesystem. "You can have more if you want, but here's what's on your plate already."</p>
+            <div class="flow">
+                <div class="flow-step">
+                    <div class="flow-num">1</div>
                     <h3>Claude reaches for a file</h3>
-                    <p>Claude Code fires a <strong>PreToolUse</strong> hook before every Read.
-                    youwhatknow gets the file path and session ID via HTTP before the read happens.</p>
+                    <p>Claude Code fires a PreToolUse hook before every Read. youwhatknow gets the file path and session ID via HTTP before the read happens.</p>
                     <code>POST /hook/pre-read</code>
                 </div>
-            </div>
-            <div class="flow-step">
-                <div class="flow-num">2</div>
-                <div>
+                <div class="flow-step">
+                    <div class="flow-num">2</div>
                     <h3>Small files get a free pass</h3>
-                    <p>Files under <strong>30 lines</strong> are waved through without intervention. They're small enough to just read.
-                    Only files over the threshold get the summary-first treatment.</p>
+                    <p>Files with 30 lines or fewer are waved through without intervention. Targeted reads with offset/limit also pass.</p>
                     <code>line_threshold = 30</code>
-                    <div class="flow-aside">Configurable per project. No point summarizing a 12-line config file.</div>
+                    <aside>No point summarizing a 12-line config file.</aside>
                 </div>
-            </div>
-            <div class="flow-step">
-                <div class="flow-num">3</div>
-                <div>
-                    <h3>A 3-line summary appears</h3>
-                    <p>Instead of 2000 lines of code, Claude sees: file description, public symbols,
-                    and folder context. Three lines. That's usually enough.</p>
-                    <code>"Entry point, server startup. Public: main()"</code>
-                    <div class="flow-aside">Think of it as the back-cover blurb instead of reading the whole book.</div>
+                <div class="flow-step">
+                    <div class="flow-num">3</div>
+                    <h3>First read: denied with a summary</h3>
+                    <p>Instead of 2000 lines of code, Claude sees: file description, public symbols, line-range map. "If this is sufficient, do not read the file. Read again for the full file."</p>
+                    <code>deny + summary</code>
+                    <aside>Think of it as the back-cover blurb instead of reading the whole book.</aside>
                 </div>
-            </div>
-            <div class="flow-step">
-                <div class="flow-num">4</div>
-                <div>
-                    <h3>Repeat offenders get called out</h3>
-                    <p>Second read? Gentle note. Third read? "This file was already read 3x this session.
-                    Summary below &#8212; do you <em>still</em> need the full file?"</p>
+                <div class="flow-step">
+                    <div class="flow-num">4</div>
+                    <h3>Second read: allowed clean</h3>
+                    <p>Claude asked twice, so it genuinely needs the file. Goes through with no context injection, no nudge, no friction.</p>
+                </div>
+                <div class="flow-step">
+                    <div class="flow-num">5</div>
+                    <h3>Repeat offenders get nudged</h3>
+                    <p>Third read and beyond: allowed, but with a reminder. "This file has been read 3x this session. Consider using offset/limit for targeted reads."</p>
                     <code>read 3x this session</code>
-                    <div class="flow-aside">Tough love. But the kind that saves your token budget.</div>
+                    <aside>Tough love. But the kind that saves your token budget.</aside>
                 </div>
-            </div>
-            <div class="flow-step">
-                <div class="flow-num">5</div>
-                <div>
+                <div class="flow-step">
+                    <div class="flow-num">6</div>
                     <h3>Day-one orientation</h3>
-                    <p>On <strong>SessionStart</strong>, Claude gets a full project map injected automatically.
-                    No more "let me explore the codebase" spirals. It already knows where everything is.</p>
+                    <p>On SessionStart, Claude gets a full project map injected automatically. No more "let me explore the codebase" spirals.</p>
                     <code>POST /hook/session-start</code>
-                    <div class="flow-aside">Like giving the new hire a map instead of letting them wander the building.</div>
+                    <aside>Like giving the new hire a map instead of letting them wander the building.</aside>
                 </div>
             </div>
         </div>
-    </div>
-</section>
+    </section>
 
-<!-- ═══ ARCHITECTURE ═══ -->
-<section class="reveal">
-    <div class="container">
-        <div class="section-label">Architecture</div>
-        <h2>One daemon to rule them all.</h2>
-        <p class="muted" style="margin-bottom: 1rem;">
-            A single process serves every Claude Code session across all your projects.
-            Spin up 5 terminals with 5 projects? Same daemon. Subagents? Same daemon.
-            It figures out which project you're in from the <strong>cwd</strong> in each request.
-        </p>
+    <!-- ── WORKING SET EVICTION ── -->
+    <section class="reveal">
+        <div class="container">
+            <div class="section-label">Working set</div>
+            <h2>Files fade. Context stays fresh.</h2>
+            <p class="muted">After more than 40 other file reads, a file's read count resets to zero. Next read shows the summary again. No stale state, no manual cleanup &mdash; the working set stays current automatically.</p>
+            <p class="muted">Configurable via <code>eviction_threshold</code> in your project config. Or use <code>youwhatknow reset &lt;path&gt;</code> to do it manually.</p>
+        </div>
+    </section>
 
-        <div class="arch-diagram">
-            <div class="arch-row">
-                <div class="arch-box secondary">Claude Session A</div>
-                <div class="arch-box secondary">Claude Session B</div>
-                <div class="arch-box secondary">Subagent</div>
-            </div>
-            <div class="arch-arrow-down">&#8595; HTTP hooks &#8595;</div>
-            <div class="arch-row">
-                <div class="arch-box primary">youwhatknow &#8212; localhost:7849</div>
-            </div>
-            <div class="arch-arrow-down">&#8595; routes by cwd &#8595;</div>
-            <div class="arch-row">
-                <div class="arch-box">Project A Index</div>
-                <div class="arch-box">Project B Index</div>
-                <div class="arch-box">Project C Index</div>
-            </div>
-            <div class="arch-arrow-down">&#8595;</div>
-            <div class="arch-row">
-                <div class="arch-box" style="min-width: 260px;">tree-sitter &#8226; haiku descriptions &#8226; TOML</div>
+    <!-- ── ARCHITECTURE ── -->
+    <section class="reveal">
+        <div class="container">
+            <div class="section-label">Architecture</div>
+            <h2>One daemon. All projects.</h2>
+            <div class="arch-diagram">
+                <div class="arch-row">
+                    <div class="arch-box secondary">Claude Session A</div>
+                    <div class="arch-box secondary">Claude Session B</div>
+                    <div class="arch-box secondary">Subagent</div>
+                </div>
+                <div class="arch-arrow">&darr; HTTP hooks &darr;</div>
+                <div class="arch-row">
+                    <div class="arch-box primary">youwhatknow &mdash; localhost:7849</div>
+                </div>
+                <div class="arch-arrow">&darr; routes by cwd &darr;</div>
+                <div class="arch-row">
+                    <div class="arch-box secondary">Project A Index</div>
+                    <div class="arch-box secondary">Project B Index</div>
+                    <div class="arch-box secondary">Project C Index</div>
+                </div>
+                <div class="arch-arrow">&darr;</div>
+                <div class="arch-row">
+                    <div class="arch-box secondary">tree-sitter &bull; haiku descriptions &bull; TOML</div>
+                </div>
             </div>
         </div>
-    </div>
-</section>
+    </section>
 
-<!-- ═══ BENEFITS ═══ -->
-<section class="reveal">
-    <div class="container">
-        <div class="section-label">The good stuff</div>
-        <h2>What's in it for you.</h2>
-
-        <div class="benefits-grid">
-            <div class="benefit">
-                <span class="benefit-icon" style="color: var(--glow);">&lt;/&gt;</span>
-                <h3>Context on a diet</h3>
-                <p>3 lines instead of 2000. Claude gets the gist without the bloat. More room for actual thinking.</p>
-            </div>
-            <div class="benefit">
-                <span class="benefit-icon" style="color: var(--amber);">&#8634;</span>
-                <h3>"You already read that"</h3>
-                <p>Per-session tracking breaks the compulsive re-read loop. A gentle nudge before Claude goes for round 5.</p>
-            </div>
-            <div class="benefit">
-                <span class="benefit-icon" style="color: var(--red);">&#8709;</span>
-                <h3>Stupid simple setup</h3>
-                <p>One command: <code style="color: var(--glow); font-size: 11px;">youwhatknow setup</code>. Hooks, daemon, indexing &#8212; all handled. No YAML nightmares.</p>
-            </div>
-            <div class="benefit">
-                <span class="benefit-icon" style="color: var(--glow);">&#9638;</span>
-                <h3>All projects, one process</h3>
-                <p>The daemon loads project indexes lazily. First request for a new project? Indexed in the background. Zero waiting.</p>
-            </div>
-            <div class="benefit">
-                <span class="benefit-icon" style="color: var(--amber);">&#8635;</span>
-                <h3>Keeps itself fresh</h3>
-                <p>Incremental re-indexing via git diff. Only changed files get re-processed. Fast and quiet.</p>
-            </div>
-            <div class="benefit">
-                <span class="benefit-icon" style="color: var(--red);">&#10005;</span>
-                <h3>Invisible when off</h3>
-                <p>Daemon not running? Claude works normally. HTTP hooks fail silently. It's there when you want it, gone when you don't.</p>
+    <!-- ── BENEFITS ── -->
+    <section class="reveal">
+        <div class="container">
+            <div class="section-label">Why bother</div>
+            <h2>Six reasons to stop the madness.</h2>
+            <div class="benefits-grid">
+                <div class="benefit">
+                    <div class="benefit-icon glow">&lt;/&gt;</div>
+                    <h3>Summary first, file second</h3>
+                    <p>Claude gets description, symbols, and line ranges. Has to ask twice for the full file. Less context waste.</p>
+                </div>
+                <div class="benefit">
+                    <div class="benefit-icon amber">&#8634;</div>
+                    <h3>Working set eviction</h3>
+                    <p>After 41+ intervening file reads, stale counts reset automatically. No manual cleanup.</p>
+                </div>
+                <div class="benefit">
+                    <div class="benefit-icon red">&#8635;</div>
+                    <h3>"You already read that"</h3>
+                    <p>Per-session tracking nudges Claude on 3rd+ reads to use offset/limit.</p>
+                </div>
+                <div class="benefit">
+                    <div class="benefit-icon glow">&empty;</div>
+                    <h3>Stupid simple setup</h3>
+                    <p>One command: <code>youwhatknow setup</code>. Hooks, daemon, indexing &mdash; all handled. No YAML nightmares.</p>
+                </div>
+                <div class="benefit">
+                    <div class="benefit-icon amber">&#9638;</div>
+                    <h3>All projects, one process</h3>
+                    <p>The daemon loads project indexes lazily. First request for a new project? Indexed in the background. Zero waiting.</p>
+                </div>
+                <div class="benefit">
+                    <div class="benefit-icon red">&#10005;</div>
+                    <h3>Invisible when off</h3>
+                    <p>Daemon not running? Claude works normally. HTTP hooks fail silently. It's there when you want it, gone when you don't.</p>
+                </div>
             </div>
         </div>
-    </div>
-</section>
+    </section>
 
-<!-- ═══ SETUP ═══ -->
-<section class="reveal" id="setup">
-    <div class="container">
-        <div class="section-label">Get started</div>
-        <h2>One command. Seriously.</h2>
+    <!-- ── SETUP ── -->
+    <section class="reveal" id="setup">
+        <div class="container">
+            <div class="section-label">Get started</div>
+            <h2>Three commands. Maybe two.</h2>
 
-        <div class="setup-block">
-            <div class="setup-header">
-                <span>terminal</span>
-                <span class="setup-tag">the whole thing</span>
-            </div>
-            <div class="setup-code"><span class="s">$</span> cd your-project
-<span class="s">$</span> youwhatknow setup
-
-<span class="c"># Creates .claude/ and .claude/summaries/</span>
-<span class="c"># Merges hook config into .claude/settings.local.json</span>
-<span class="c"># Starts the daemon if not already running</span>
-<span class="c"># Triggers initial project indexing</span>
-<span class="c"># That's genuinely it.</span></div>
-        </div>
-
-        <div class="setup-block" style="margin-top: 1.5rem;">
-            <div class="setup-header">
-                <span>terminal</span>
-                <span class="setup-tag">variants</span>
-            </div>
-            <div class="setup-code"><span class="s">$</span> youwhatknow setup --shared    <span class="c"># writes to .claude/settings.json (team-shared)</span>
-<span class="s">$</span> youwhatknow setup --no-index  <span class="c"># skip initial indexing</span>
-
-<span class="c"># Existing hooks in your settings file are preserved &#8212; it merges, not overwrites.</span></div>
-        </div>
-
-        <div class="setup-block" style="margin-top: 1.5rem;">
-            <div class="setup-header">
-                <span>terminal</span>
-                <span class="setup-tag">other useful commands</span>
-            </div>
-            <div class="setup-code"><span class="s">$</span> youwhatknow status            <span class="c"># daemon uptime, active sessions, registered projects</span>
-<span class="s">$</span> youwhatknow summary src/main.rs <span class="c"># preview a file's summary (no read count triggered)</span></div>
-        </div>
-
-        <details style="margin-top: 2rem; color: var(--text-dim); font-size: 13px;">
-            <summary style="cursor: pointer; color: var(--text); margin-bottom: 1rem;">Manual hook setup (the old way)</summary>
             <div class="setup-block">
-                <div class="setup-header">
-                    <span>~/.claude/settings.json</span>
-                    <span class="setup-tag">manual</span>
-                </div>
-                <div class="setup-code">{
-  <span class="k">"hooks"</span>: {
-    <span class="k">"PreToolUse"</span>: [{
-      <span class="k">"matcher"</span>: <span class="s">"Read"</span>,
-      <span class="k">"hooks"</span>: [{
-        <span class="k">"type"</span>: <span class="s">"http"</span>,
-        <span class="k">"url"</span>: <span class="s">"http://localhost:7849/hook/pre-read"</span>
-      }]
-    }],
-    <span class="k">"SessionStart"</span>: [{
-      <span class="k">"matcher"</span>: <span class="s">"startup"</span>,
-      <span class="k">"hooks"</span>: [{
-        <span class="k">"type"</span>: <span class="s">"http"</span>,
-        <span class="k">"url"</span>: <span class="s">"http://localhost:7849/hook/session-start"</span>
-      }]
-    }]
+                <div class="setup-header">install <span class="setup-tag">pick one</span></div>
+                <pre class="setup-code"><code>$ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/wavefunk/youwhatknow/releases/latest/download/youwhatknow-installer.sh | sh
+
+# Or: nix flake (see docs)
+# Or: build from source
+$ cargo build --release</code></pre>
+            </div>
+
+            <div class="setup-block">
+                <div class="setup-header">terminal <span class="setup-tag">the whole thing</span></div>
+                <pre class="setup-code"><code>$ cd your-project
+$ youwhatknow setup
+
+# Creates .claude/ and .claude/summaries/
+# Merges hook config into .claude/settings.local.json
+# Starts the daemon if not already running
+# Triggers initial project indexing
+# That's genuinely it.</code></pre>
+            </div>
+
+            <div class="setup-block">
+                <div class="setup-header">terminal <span class="setup-tag">variants &amp; commands</span></div>
+                <pre class="setup-code"><code>$ youwhatknow setup --shared    # writes to .claude/settings.json (team-shared)
+$ youwhatknow setup --no-index  # skip initial indexing
+$ youwhatknow status            # daemon uptime, active sessions, projects
+$ youwhatknow summary src/main.rs # preview a file's summary
+$ youwhatknow reset src/main.rs   # reset read count for a file</code></pre>
+            </div>
+
+            <details>
+                <summary>Manual hook setup</summary>
+                <p>If you prefer to configure hooks manually, add this to <code>.claude/settings.local.json</code>:</p>
+                <pre class="setup-code"><code>{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "url": "http://localhost:7849/hook/pre-read"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Read",
+        "url": "http://localhost:7849/hook/post-read"
+      }
+    ],
+    "SessionStart": [
+      {
+        "url": "http://localhost:7849/hook/session-start"
+      }
+    ]
   }
-}
+}</code></pre>
+            </details>
 
-<span class="c">Then start the daemon:</span>
-<span class="s">$</span> youwhatknow</div>
-            </div>
-        </details>
-
-        <div class="setup-block" style="margin-top: 1.5rem;">
-            <div class="setup-header">
-                <span>~/.config/youwhatknow/config.toml</span>
-                <span class="setup-tag">optional &#8212; for the tinkerers</span>
-            </div>
-            <div class="setup-code"><span class="c"># All settings have sensible defaults. You probably don't need this file.</span>
-<span class="k">port</span> = <span class="s">7849</span>                  <span class="c"># daemon port</span>
-<span class="k">session_timeout_minutes</span> = <span class="s">60</span>   <span class="c"># stale session cleanup</span>
-<span class="k">idle_shutdown_minutes</span> = <span class="s">30</span>     <span class="c"># auto-shutdown when bored</span></div>
+            <details>
+                <summary>Optional config.toml</summary>
+                <pre class="setup-code"><code># ~/.config/youwhatknow/config.toml
+# All settings have sensible defaults.
+port = 7849
+session_timeout_minutes = 60
+idle_shutdown_minutes = 30</code></pre>
+            </details>
         </div>
-    </div>
-</section>
+    </section>
 
-<footer>
-    <div class="container">
-        <div class="footer-logo">youwhat(k)now</div>
-        <p style="margin-bottom: 0.75rem;">
-            <a href="docs.html" style="font-size: 12px; margin-right: 1.5rem;">Docs</a>
-            <a href="https://github.com/wavefunk/youwhatknow" style="font-size: 12px;">GitHub</a>
-        </p>
-        <p>Built with Rust, Tokio, Axum, and tree-sitter.</p>
-        <p class="footer-quip">"No Claude was harmed in the making of this tool. Just mildly inconvenienced."</p>
-    </div>
-</footer>
+    <!-- ── FOOTER ── -->
+    <footer>
+        <div class="container">
+            <div class="footer-logo">youwhat(k)now</div>
+            <p style="margin-bottom: 0.75rem;">
+                <a href="docs.html" style="font-size: 12px; margin-right: 1.5rem;">Docs</a>
+                <a href="https://github.com/wavefunk/youwhatknow" style="font-size: 12px;">GitHub</a>
+            </p>
+            <p>Built with Rust, Tokio, Axum, and tree-sitter.</p>
+            <p class="footer-quip">"No Claude was harmed in the making of this tool. Just mildly inconvenienced."</p>
+        </div>
+    </footer>
 
-<script>
+    <script src="js/main.js"></script>
+
+    <!-- inline terminal demo script -->
+    <script>
 (function() {
     var lines = [
-        { type: 'cmd', prompt: 'claude', cmd: 'Read', file: 'src/main.rs' },
-        { type: 'msg', text: '  847 lines loaded. Cool, cool.', cls: 't-dim' },
-        { type: 'cmd', prompt: 'claude', cmd: 'Read', file: 'src/config.rs' },
-        { type: 'msg', text: '  412 lines. Sure.', cls: 't-dim' },
-        { type: 'cmd', prompt: 'claude', cmd: 'Read', file: 'src/main.rs' },
-        { type: 'msg', text: '  847 lines. Wait, again?', cls: 't-warn' },
         { type: 'cmd', prompt: 'claude', cmd: 'Read', file: 'src/server.rs' },
-        { type: 'msg', text: '  623 lines. At least this one is new.', cls: 't-dim' },
-        { type: 'cmd', prompt: 'claude', cmd: 'Read', file: 'src/main.rs' },
-        { type: 'msg', text: '  847 lines. Third time. Really?', cls: 't-warn' },
+        { type: 'msg', text: '  623 lines.', cls: 't-dim' },
         { type: 'msg', text: '', cls: 't-dim' },
-        { type: 'msg', text: '  youwhatknow: hey, buddy.', cls: 't-ok t-bold' },
-        { type: 'msg', text: '  -- src/main.rs (read 3x this session) --', cls: 't-ok' },
-        { type: 'msg', text: '  Entry point, server startup', cls: 't-ok' },
-        { type: 'msg', text: '  Public: main()', cls: 't-ok' },
-        { type: 'msg', text: '  You sure you need all 847 lines again?', cls: 't-warn' },
+        { type: 'msg', text: '  youwhatknow: denied.', cls: 't-ok t-bold' },
+        { type: 'msg', text: '  src/server.rs (623 lines) \u2014 Axum server with activity tracking', cls: 't-ok' },
+        { type: 'msg', text: '  Public: create_router, start_server, AppState', cls: 't-ok' },
+        { type: 'msg', text: '  If this summary is sufficient, do not read the file.', cls: 't-ok' },
+        { type: 'msg', text: '', cls: 't-dim' },
+        { type: 'cmd', prompt: 'claude', cmd: 'Read', file: 'src/config.rs' },
+        { type: 'msg', text: '  Claude moves on. Summary was enough.', cls: 't-dim' },
+        { type: 'msg', text: '', cls: 't-dim' },
+        { type: 'cmd', prompt: 'claude', cmd: 'Read', file: 'src/server.rs' },
+        { type: 'msg', text: '  Second read \u2014 allowed through.', cls: 't-dim' },
+        { type: 'msg', text: '', cls: 't-dim' },
+        { type: 'cmd', prompt: 'claude', cmd: 'Read', file: 'src/server.rs' },
+        { type: 'msg', text: '  Third time. Really?', cls: 't-warn' },
+        { type: 'msg', text: '  read 3x this session \u2014 consider offset/limit', cls: 't-ok' },
     ];
 
     var terminal = document.getElementById('terminal-demo');
@@ -938,7 +379,7 @@
         observer.observe(el);
     });
 })();
-</script>
+    </script>
 
 </body>
 </html>
