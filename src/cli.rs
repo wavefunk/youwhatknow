@@ -204,21 +204,7 @@ pub fn logs(follow: bool, lines: usize) -> eyre::Result<()> {
     }
 
     if follow {
-        #[cfg(unix)]
-        {
-            use std::os::unix::process::CommandExt;
-            let err = std::process::Command::new("tail")
-                .args(["-f", "-n"])
-                .arg(lines.to_string())
-                .arg(&log_path)
-                .exec();
-            // exec only returns on error
-            eyre::bail!("failed to exec tail: {err}");
-        }
-        #[cfg(not(unix))]
-        {
-            eyre::bail!("--follow is only supported on Unix");
-        }
+        return follow_log(&log_path, lines);
     }
 
     let content = std::fs::read_to_string(&log_path)?;
@@ -264,7 +250,48 @@ pub fn restart() -> eyre::Result<()> {
     Ok(())
 }
 
-/// Stop the daemon by sending SIGTERM to the PID in the pid file.
+/// Follow log file output, printing new lines as they appear.
+fn follow_log(log_path: &std::path::Path, initial_lines: usize) -> eyre::Result<()> {
+    use std::io::{BufRead, BufReader, Seek, SeekFrom};
+
+    let file = std::fs::File::open(log_path)?;
+    let mut reader = BufReader::new(file);
+
+    // Read all content to find the tail position
+    let mut all_content = String::new();
+    reader.read_to_string(&mut all_content)?;
+    let lines: Vec<&str> = all_content.lines().collect();
+    let start = lines.len().saturating_sub(initial_lines);
+    for line in &lines[start..] {
+        println!("{line}");
+    }
+
+    // Now seek to end and poll for new content
+    let end_pos = reader.seek(SeekFrom::End(0))?;
+    drop(reader);
+
+    let mut pos = end_pos;
+    let mut line_buf = String::new();
+    loop {
+        let file = std::fs::File::open(log_path)?;
+        let mut reader = BufReader::new(file);
+        reader.seek(SeekFrom::Start(pos))?;
+
+        loop {
+            line_buf.clear();
+            let bytes = reader.read_line(&mut line_buf)?;
+            if bytes == 0 {
+                break;
+            }
+            pos += bytes as u64;
+            print!("{line_buf}");
+        }
+
+        std::thread::sleep(Duration::from_millis(200));
+    }
+}
+
+/// Stop the daemon by terminating the process from the PID file.
 fn stop_daemon() -> eyre::Result<()> {
     let pid_path = crate::config::data_dir().join("youwhatknow.pid");
     if !pid_path.exists() {
@@ -277,13 +304,24 @@ fn stop_daemon() -> eyre::Result<()> {
         .parse()
         .map_err(|e| eyre::eyre!("invalid PID in {}: {e}", pid_path.display()))?;
 
-    let status = std::process::Command::new("kill")
-        .arg(pid.to_string())
-        .status()?;
+    #[cfg(unix)]
+    {
+        let status = std::process::Command::new("kill")
+            .arg(pid.to_string())
+            .status()?;
+        if !status.success() {
+            eprintln!("warning: kill exited with {status}");
+        }
+    }
 
-    if !status.success() {
-        // Exit code 1 from kill usually means process already gone
-        eprintln!("warning: kill exited with {status}");
+    #[cfg(windows)]
+    {
+        let status = std::process::Command::new("taskkill")
+            .args(["/PID", &pid.to_string()])
+            .status()?;
+        if !status.success() {
+            eprintln!("warning: taskkill exited with {status}");
+        }
     }
 
     Ok(())
