@@ -155,7 +155,7 @@ pub fn reset(file_path: &str, session_override: Option<&str>) -> eyre::Result<()
 }
 
 /// Handle the `status` subcommand: query daemon and display status.
-pub fn status() -> eyre::Result<()> {
+pub fn status(json: bool) -> eyre::Result<()> {
     let config = Config::load()?;
     let base_url = format!("http://127.0.0.1:{}", config.port);
 
@@ -166,18 +166,36 @@ pub fn status() -> eyre::Result<()> {
     let resp = match client.get(format!("{base_url}/status")).send() {
         Ok(r) => r,
         Err(e) if e.is_connect() => {
+            if json {
+                println!(r#"{{"running":false}}"#);
+                return Ok(());
+            }
             eprintln!("daemon is not running");
             std::process::exit(1);
         }
         Err(e) => {
+            if json {
+                println!(r#"{{"running":false,"error":"{}"}}"#, e);
+                return Ok(());
+            }
             eprintln!("failed to reach daemon: {e}");
             std::process::exit(1);
         }
     };
 
     if !resp.status().is_success() {
+        if json {
+            println!(r#"{{"running":false,"error":"http {}"}}"#, resp.status());
+            return Ok(());
+        }
         eprintln!("daemon returned {}", resp.status());
         std::process::exit(1);
+    }
+
+    if json {
+        let text = resp.text()?;
+        println!("{text}");
+        return Ok(());
     }
 
     let status: StatusResponse = resp.json()?;
@@ -190,6 +208,54 @@ pub fn status() -> eyre::Result<()> {
     println!("  projects:         {}", status.loaded_projects);
     println!("  idle shutdown:    {}m", status.idle_shutdown_minutes);
 
+    Ok(())
+}
+
+/// Handle the `reindex` subcommand: trigger project reindex via daemon.
+pub fn reindex(full: bool, json: bool) -> eyre::Result<()> {
+    let config = Config::load()?;
+    let base_url = format!("http://127.0.0.1:{}", config.port);
+
+    if !daemon_is_running(&base_url) {
+        spawn_daemon()?;
+        wait_for_daemon(&base_url)?;
+    }
+
+    let cwd = std::env::current_dir()?;
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()?;
+
+    let body = serde_json::json!({
+        "cwd": cwd,
+        "full": full,
+    });
+
+    let resp = client
+        .post(format!("{base_url}/reindex"))
+        .header("content-type", "application/json")
+        .body(serde_json::to_string(&body)?)
+        .send()?;
+
+    let status = resp.status();
+    if !status.is_success() {
+        eyre::bail!("reindex failed: {status}");
+    }
+
+    if json {
+        println!(r#"{{"accepted":true,"full":{full}}}"#);
+    } else {
+        let mode = if full { "full" } else { "incremental" };
+        eprintln!("Reindex ({mode}) accepted.");
+    }
+
+    Ok(())
+}
+
+/// Output AI-agent workflow context (like `bd prime`).
+pub fn prime() -> eyre::Result<()> {
+    print!("{PRIME_TEXT}");
     Ok(())
 }
 
@@ -367,7 +433,10 @@ pub fn setup(shared: bool, no_index: bool) -> eyre::Result<()> {
     let summaries_dir = claude_dir.join("summaries");
     std::fs::create_dir_all(&summaries_dir)?;
 
-    // 7. Optionally trigger indexing
+    // 7. Add youwhatknow section to AGENTS.md
+    write_agents_md(&cwd)?;
+
+    // 8. Optionally trigger indexing
     if !no_index {
         let base_url = format!("http://127.0.0.1:{}", config.port);
         if !daemon_is_running(&base_url) {
@@ -569,6 +638,124 @@ fn merge_hooks(mut settings: serde_json::Value, port: u16) -> MergeResult {
     MergeResult { settings, preserved }
 }
 
+const BEGIN_MARKER: &str = "<!-- BEGIN YOUWHATKNOW INTEGRATION -->";
+const END_MARKER: &str = "<!-- END YOUWHATKNOW INTEGRATION -->";
+
+/// Add or replace the youwhatknow section in AGENTS.md.
+fn write_agents_md(project_root: &std::path::Path) -> eyre::Result<()> {
+    let agents_path = project_root.join("AGENTS.md");
+    let section = format!("{BEGIN_MARKER}\n{AGENTS_SECTION}{END_MARKER}\n");
+
+    if agents_path.exists() {
+        let content = std::fs::read_to_string(&agents_path)?;
+
+        if let (Some(start), Some(end)) = (content.find(BEGIN_MARKER), content.find(END_MARKER)) {
+            // Replace existing section
+            let before = &content[..start];
+            let after = &content[end + END_MARKER.len()..];
+            let updated = format!("{before}{section}{after}");
+            std::fs::write(&agents_path, updated)?;
+            eprintln!("Updated youwhatknow section in AGENTS.md");
+        } else {
+            // Append section
+            use std::io::Write;
+            let mut file = std::fs::OpenOptions::new()
+                .append(true)
+                .open(&agents_path)?;
+            writeln!(file)?;
+            write!(file, "{section}")?;
+            eprintln!("Added youwhatknow section to AGENTS.md");
+        }
+    } else {
+        std::fs::write(&agents_path, format!("# Agent Instructions\n\n{section}"))?;
+        eprintln!("Created AGENTS.md with youwhatknow section.");
+    }
+
+    Ok(())
+}
+
+const AGENTS_SECTION: &str = "\
+## File Summaries (youwhatknow)
+
+This project uses **youwhatknow** for automatic file summaries during Claude Code sessions.
+It works via hooks — no manual action needed.
+
+**How it works:**
+- Large files show a summary (description, symbols, line ranges) on first read
+- Read again for full content, or use offset/limit to target sections
+- Project structure is injected at session start
+
+**Useful commands:**
+```bash
+youwhatknow status              # Check daemon health
+youwhatknow status --json       # Machine-readable status
+youwhatknow reindex             # Refresh index after major changes
+youwhatknow reindex --full      # Full reindex (ignore change detection)
+youwhatknow summary <path>      # Preview a file summary
+youwhatknow reset <path>        # Reset read count for a file
+youwhatknow restart             # Restart daemon
+youwhatknow logs                # View daemon logs
+youwhatknow prime               # Full agent workflow context
+```
+
+";
+
+const PRIME_TEXT: &str = "\
+# youwhatknow — Agent Workflow Context
+
+> Run `youwhatknow prime` to regenerate this context in a new session.
+
+## What It Does
+
+youwhatknow is a Claude Code hook server that **intercepts file reads** and shows
+summaries instead of full content on first read. This reduces token usage and gives
+you a structural overview before diving into code.
+
+## How It Works (Automatic)
+
+Two hooks fire automatically — no action needed from you:
+
+1. **SessionStart**: Daemon starts, project is indexed, session instructions + project
+   map are injected into context.
+2. **PreToolUse (Read)**: On first read of a large file, you see a summary with
+   description, public symbols, and line ranges. Read again for full content, or use
+   offset/limit to target specific sections.
+
+## CLI Commands
+
+```bash
+# Diagnostics
+youwhatknow status              # Daemon health (human-readable)
+youwhatknow status --json       # Daemon health (machine-readable)
+youwhatknow logs                # Last 50 lines of daemon log
+youwhatknow logs -f             # Follow log output
+youwhatknow logs -n 100         # Last 100 lines
+
+# Index management
+youwhatknow reindex             # Incremental reindex of current project
+youwhatknow reindex --full      # Full reindex (ignore change detection)
+youwhatknow reindex --json      # JSON output for programmatic use
+
+# File operations
+youwhatknow summary <path>      # Preview file summary without triggering a read
+youwhatknow reset <path>        # Reset read count (show summary again on next read)
+
+# Daemon lifecycle
+youwhatknow restart             # Stop and restart the daemon
+
+# Project setup
+youwhatknow setup               # Configure hooks in .claude/settings.local.json
+youwhatknow setup --shared      # Configure hooks in .claude/settings.json
+```
+
+## Troubleshooting
+
+- **Summaries not showing?** → `youwhatknow status` to check daemon, `youwhatknow restart` if needed
+- **Stale summaries?** → `youwhatknow reindex --full` to rebuild index
+- **Need full file?** → Just read the file again, or use offset/limit
+- **Check logs** → `youwhatknow logs -n 20` for recent activity
+";
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -737,6 +924,55 @@ mod tests {
         let tailed: Vec<&str> = all_lines[start..].to_vec();
 
         assert_eq!(tailed, vec!["line1", "line2"]);
+    }
+
+    #[test]
+    fn write_agents_md_creates_new_file() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        write_agents_md(tmp.path()).expect("write");
+        let content = std::fs::read_to_string(tmp.path().join("AGENTS.md")).expect("read");
+        assert!(content.contains("# Agent Instructions"));
+        assert!(content.contains(BEGIN_MARKER));
+        assert!(content.contains(END_MARKER));
+        assert!(content.contains("youwhatknow"));
+    }
+
+    #[test]
+    fn write_agents_md_appends_to_existing() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(tmp.path().join("AGENTS.md"), "# My Agents\n\nExisting content.\n")
+            .expect("write");
+        write_agents_md(tmp.path()).expect("write");
+        let content = std::fs::read_to_string(tmp.path().join("AGENTS.md")).expect("read");
+        assert!(content.contains("# My Agents"));
+        assert!(content.contains("Existing content."));
+        assert!(content.contains(BEGIN_MARKER));
+        assert!(content.contains("youwhatknow"));
+    }
+
+    #[test]
+    fn write_agents_md_replaces_existing_section() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let initial = format!(
+            "# Agents\n\n{BEGIN_MARKER}\nold content\n{END_MARKER}\n\nOther stuff.\n"
+        );
+        std::fs::write(tmp.path().join("AGENTS.md"), &initial).expect("write");
+        write_agents_md(tmp.path()).expect("write");
+        let content = std::fs::read_to_string(tmp.path().join("AGENTS.md")).expect("read");
+        assert!(!content.contains("old content"));
+        assert!(content.contains("youwhatknow"));
+        assert!(content.contains("Other stuff."));
+        // Only one begin/end marker pair
+        assert_eq!(content.matches(BEGIN_MARKER).count(), 1);
+        assert_eq!(content.matches(END_MARKER).count(), 1);
+    }
+
+    #[test]
+    fn prime_text_contains_key_commands() {
+        assert!(PRIME_TEXT.contains("youwhatknow status"));
+        assert!(PRIME_TEXT.contains("youwhatknow reindex"));
+        assert!(PRIME_TEXT.contains("youwhatknow restart"));
+        assert!(PRIME_TEXT.contains("--json"));
     }
 
     #[test]

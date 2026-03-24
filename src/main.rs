@@ -44,7 +44,22 @@ enum Command {
         no_index: bool,
     },
     /// Show daemon status
-    Status,
+    Status {
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
+    },
+    /// Reindex the current project
+    Reindex {
+        /// Force full reindex (ignore change detection)
+        #[arg(long)]
+        full: bool,
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
+    },
+    /// Output AI-agent workflow context
+    Prime,
     /// Show daemon logs
     Logs {
         /// Follow log output (like tail -f)
@@ -81,7 +96,9 @@ fn main() -> eyre::Result<()> {
         Some(Command::Setup { shared, local: _, no_index }) => {
             cli::setup(shared, no_index)
         }
-        Some(Command::Status) => cli::status(),
+        Some(Command::Status { json }) => cli::status(json),
+        Some(Command::Reindex { full, json }) => cli::reindex(full, json),
+        Some(Command::Prime) => cli::prime(),
         Some(Command::Logs { follow, lines }) => cli::logs(follow, lines),
         Some(Command::Restart) => cli::restart(),
         Some(Command::Reset { path, session }) => cli::reset(&path, session.as_deref()),
