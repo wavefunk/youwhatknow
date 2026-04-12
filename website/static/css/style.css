@@ -1102,6 +1102,8 @@ body.docs-page nav { margin-bottom: 2rem; }
 @media (max-width: 1024px) {
     .docs-layout {
         grid-template-columns: 1fr;
+        padding: 0 1.5rem;
+        gap: 0;
     }
 
     .sidebar {
@@ -1121,4 +1123,38 @@ body.docs-page nav { margin-bottom: 2rem; }
     .sidebar.open { left: 0; }
     .sidebar-toggle { display: flex; align-items: center; justify-content: center; }
     .sidebar-overlay.open { display: block; }
+}
+
+@media (max-width: 768px) {
+    .docs-layout { padding: 0 1rem; }
+
+    .doc-content p { max-width: 100%; }
+
+    .doc-content pre {
+        padding: 1rem;
+        font-size: 11.5px;
+        margin-left: -1rem;
+        margin-right: -1rem;
+        border-left: none;
+        border-right: none;
+        border-radius: 0;
+    }
+
+    .doc-content table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        font-size: 12px;
+    }
+
+    .doc-content td:first-child { white-space: normal; }
+
+    .doc-content blockquote {
+        padding: 0.75rem 1rem;
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    .page-header { padding: 0 1rem; }
+    .page-header h1 { font-size: 2rem; }
 }
