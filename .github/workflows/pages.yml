@@ -1,9 +1,13 @@
-name: Deploy website
+# Build with eigen and deploy to GitHub Pages
+name: Website
 
 on:
   push:
-    branches: [master]
-    paths: ['website/**']
+    branches: ["master"]
+    paths:
+      - 'website/**'
+      - '.github/workflows/pages.yml'
+
   workflow_dispatch:
 
 permissions:
@@ -12,33 +16,30 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: "pages"
   cancel-in-progress: false
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install eigen
-        run: |
-          curl -fsSL https://github.com/wavefunk/eigen/releases/latest/download/eigen-x86_64-unknown-linux-gnu.tar.gz | tar xz
-          sudo mv eigen /usr/local/bin/
-
-      - name: Build site
-        run: eigen build
-        working-directory: website
-
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build with eigen
+        uses: wavefunk/eigen/github-action@master
+        with:
+          source: './website'
       - name: Add CNAME
         run: cp -f website/CNAME website/dist/CNAME
-
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          path: website/dist
-      - uses: actions/deploy-pages@v4
+          path: 'website/dist'
+      - name: Deploy to GitHub Pages
         id: deployment
+        uses: actions/deploy-pages@v4
