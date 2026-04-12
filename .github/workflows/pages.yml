@@ -25,6 +25,10 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    env:
+      # Nix docs contain ${system} references — set to itself so
+      # eigen's interpolation is a no-op.
+      system: ${system}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
