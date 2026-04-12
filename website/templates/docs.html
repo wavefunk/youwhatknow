@@ -1,0 +1,40 @@
+---
+seo:
+  title: "Documentation — youwhatknow"
+  description: "Everything you need to install, configure, and understand youwhatknow."
+---
+{% extends "_base.html" %}
+
+{% block title %}youwhatknow &mdash; docs{% endblock %}
+{% block body_class %}docs-page{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-bottom: 2rem;">
+    <div class="page-header">
+        <h1>Documentation</h1>
+        <p>Everything you need to install, configure, and understand youwhatknow.</p>
+    </div>
+</div>
+
+<div class="docs-layout">
+    <div id="sidebar-overlay" class="sidebar-overlay" onclick="closeSidebar()"></div>
+    <aside id="sidebar" class="sidebar">
+        <div class="sidebar-title">On this page</div>
+        <ul class="sidebar-nav">
+            {% for section in docs %}
+            <li><a href="#{{ section.slug }}">{{ section.title }}</a></li>
+            {% endfor %}
+        </ul>
+    </aside>
+
+    <div class="doc-content">
+        {% for section in docs %}
+        <section id="{{ section.slug }}" class="doc-section">
+            {{ section.content | markdown }}
+        </section>
+        {% endfor %}
+    </div>
+</div>
+
+<button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle table of contents">&#9776;</button>
+{% endblock %}
