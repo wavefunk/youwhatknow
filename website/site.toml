@@ -1,0 +1,44 @@
+[site]
+name = "youwhatknow"
+base_url = "https://youwhatknow.it"
+
+[site.seo]
+title = "youwhatknow — Claude Code hook server"
+description = "Stop Claude from re-reading files. A hook server that injects file summaries and tracks repeat reads per session."
+og_type = "website"
+
+[build]
+fragments = true
+fragment_dir = "_fragments"
+content_block = "content"
+minify = true
+
+[build.critical_css]
+enabled = true
+max_inline_size = 50000
+preload_full = true
+
+[build.hints]
+enabled = true
+auto_detect_hero = true
+prefetch_links = true
+
+[build.content_hash]
+enabled = true
+
+[build.bundling]
+enabled = true
+css = true
+js = true
+tree_shake_css = true
+
+[sitemap]
+enabled = true
+
+[robots]
+enabled = true
+sitemap = true
+
+[[robots.rules]]
+user_agent = "*"
+allow = ["/"]
