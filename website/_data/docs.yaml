@@ -1,0 +1,749 @@
+- title: Installation
+  slug: installation
+  content: |
+    ## Installation
+
+    Three ways to install youwhatknow.
+
+    ### curl installer (recommended)
+
+    ```bash
+    curl --proto '=https' --tlsv1.2 -LsSf https://github.com/wavefunk/youwhatknow/releases/latest/download/youwhatknow-installer.sh | sh
+    ```
+
+    Pre-built binaries for macOS and Linux via cargo-dist.
+
+    ### Nix flake input
+
+    ```nix
+    inputs.youwhatknow.url = "github:wavefunk/youwhatknow";
+
+    # In your devShell packages:
+    packages = [ youwhatknow.packages.${system}.default ];
+    ```
+
+    See the [Nix Integration](#nix) section for shell hook and build caching details.
+
+    ### Build from source
+
+    ```bash
+    cargo build --release
+    ```
+
+    Requires Rust 2024 edition. A Nix flake is included for reproducible builds: `nix build`.
+
+- title: Quickstart
+  slug: quickstart
+  content: |
+    ## Quickstart
+
+    One command. It sets up hooks, starts the daemon, and indexes your project.
+
+    ```bash
+    cd your-project
+    youwhatknow setup
+    ```
+
+    This does five things:
+
+    1. Creates `.claude/` and `.claude/summaries/`
+    2. Merges hook configuration into `.claude/settings.local.json` (preserving existing hooks)
+    3. Adds a youwhatknow section to `AGENTS.md` (creating it if needed)
+    4. Starts the daemon if it isn't running
+    5. Triggers initial project indexing
+
+    ### Flags
+
+    ```bash
+    youwhatknow setup --shared    # writes to .claude/settings.json (team-shared)
+    youwhatknow setup --local     # writes to .claude/settings.local.json (default)
+    youwhatknow setup --no-index  # skip initial indexing
+    ```
+
+    `--local` is the default. `--shared` and `--local` are mutually exclusive.
+
+    The daemon runs on localhost:7849, indexes projects lazily when Claude first touches them, and shuts itself down after 30 minutes of inactivity.
+
+    > If the daemon isn't running, Claude Code works completely normally. HTTP hooks fail silently -- no errors, no disruption. youwhatknow is strictly additive.
+
+- title: How It Works
+  slug: how-it-works
+  content: |
+    ## How It Works
+
+    youwhatknow sits between Claude Code and your filesystem using the hook system. Two hooks do all the work.
+
+    ### The lifecycle
+
+    1. **Session starts** -- Claude Code fires a `SessionStart` hook. youwhatknow injects a project map (folder/file hierarchy with descriptions) and session instructions into context.
+    2. **Claude reads a file** -- The `PreToolUse` hook fires before every `Read` call. youwhatknow looks up the file in its index, checks the session's read count, and decides: deny with summary, allow clean, or allow with a nudge.
+    3. **Read tracking** -- Each file read is tracked per-session with a monotonic sequence counter. Files that haven't been touched recently fade back to "unread" via eviction.
+    4. **Indexing** -- On first contact with a project, youwhatknow discovers files via `git ls-files`, extracts symbols with tree-sitter, generates descriptions via Haiku, and builds an in-memory index backed by TOML files on disk.
+
+    ### What makes it different
+
+    - **Soft deny** -- Claude can always read the file by asking again. youwhatknow just makes it consider the summary first.
+    - **No configuration required** -- `youwhatknow setup` handles everything. Sensible defaults, optional tuning.
+    - **Graceful degradation** -- If the daemon is down, hooks fail silently. Claude Code works normally.
+
+- title: CLI Reference
+  slug: cli-reference
+  content: |
+    ## CLI Reference
+
+    All subcommands. The daemon itself is started via the CLI (no arguments = start serving).
+
+    ### youwhatknow (serve)
+
+    Starts the HTTP daemon on localhost:7849. Also available as `youwhatknow serve`. Indexes projects lazily on first request. Shuts down after `idle_shutdown_minutes` of inactivity.
+
+    ```bash
+    youwhatknow
+    youwhatknow serve
+    ```
+
+    ### youwhatknow setup
+
+    One-command project setup. Creates `.claude/` and `.claude/summaries/`, merges hook config into the settings file, adds a section to `AGENTS.md`, starts the daemon if not running, and triggers initial indexing.
+
+    ```bash
+    youwhatknow setup              # writes to .claude/settings.local.json (default)
+    youwhatknow setup --shared     # writes to .claude/settings.json (team-shared)
+    youwhatknow setup --local      # explicit default (settings.local.json)
+    youwhatknow setup --no-index   # skip initial indexing
+    ```
+
+    Existing hooks in the target settings file are preserved -- setup merges, it doesn't overwrite. `--shared` and `--local` are mutually exclusive.
+
+    ### youwhatknow init
+
+    The `SessionStart` hook handler. Reads the hook payload from stdin, writes the session ID to `$CLAUDE_ENV_FILE` as `YOUWHATKNOW_SESSION`, ensures the daemon is running, and proxies the request to `/hook/session-start`. This is called automatically by the Claude Code hook -- you don't run this manually.
+
+    ### youwhatknow status
+
+    Shows daemon status: PID, port, uptime, idle time, active sessions, loaded projects, and idle shutdown configuration. Talks to the running daemon via `/status`.
+
+    ```bash
+    youwhatknow status          # human-readable output
+    youwhatknow status --json   # machine-readable JSON output
+    ```
+
+    If the daemon isn't running, prints an error and exits with code 1 (or `{"running":false}` in JSON mode).
+
+    ### youwhatknow summary \<path\>
+
+    Preview a file's summary without triggering a hook. If a session is active (via `$YOUWHATKNOW_SESSION`), primes the read count so the next Read hook allows the file through without a deny.
+
+    ```bash
+    youwhatknow summary src/main.rs
+    ```
+
+    ### youwhatknow reindex
+
+    Triggers a re-index of the current project via the daemon.
+
+    ```bash
+    youwhatknow reindex           # incremental (only changed files)
+    youwhatknow reindex --full    # full reindex (ignore change detection)
+    youwhatknow reindex --json    # JSON output for programmatic use
+    ```
+
+    Returns immediately -- indexing runs in the background.
+
+    ### youwhatknow reset \<path\>
+
+    Resets the read count for a file to zero. Next read will show the summary again. Uses `$YOUWHATKNOW_SESSION` or the `--session` flag to identify the session.
+
+    ```bash
+    youwhatknow reset src/main.rs
+    youwhatknow reset src/main.rs --session abc123
+    ```
+
+    ### youwhatknow logs
+
+    Show daemon log output from `~/.local/share/youwhatknow/daemon.log`.
+
+    ```bash
+    youwhatknow logs              # last 50 lines (default)
+    youwhatknow logs -n 100       # last 100 lines
+    youwhatknow logs -f           # follow log output (like tail -f)
+    youwhatknow logs --follow     # same as -f
+    youwhatknow logs --lines 200  # same as -n 200
+    ```
+
+    ### youwhatknow restart
+
+    Stop and restart the daemon. Sends a kill signal to the PID from the PID file, waits up to 10 seconds for it to stop, then spawns a new instance.
+
+    ```bash
+    youwhatknow restart
+    ```
+
+    ### youwhatknow prime
+
+    Output AI-agent workflow context. Prints a block of text describing how youwhatknow works, all available CLI commands, and troubleshooting tips. Useful at session start or when an agent needs full context.
+
+    ```bash
+    youwhatknow prime
+    ```
+
+- title: Hook Behavior
+  slug: hook-behavior
+  content: |
+    ## Hook Behavior
+
+    youwhatknow uses Claude Code's HTTP hook system. Two hooks do all the work.
+
+    ### PreToolUse / Read
+
+    Fires before every `Read` tool call. The daemon receives the file path and session ID, looks up the file in the project index, and decides whether to allow or deny the read.
+
+    ### Early exits
+
+    These cases always allow the read with no tracking:
+
+    - No `tool_input` in the hook payload
+    - File is outside the project directory (`strip_prefix` fails)
+    - No summary exists in the index for this file
+    - Targeted read (`offset` or `limit` parameter present)
+    - File is at or under `line_threshold` (default: 30 lines)
+
+    ### Read count behavior
+
+    | Count | Decision | What Claude sees |
+    |-------|----------|-----------------|
+    | 1 | **DENY** | File summary with description, symbols, line-range map, and instruction to read again if needed |
+    | 2 | **ALLOW** | Nothing injected. Claude proved it needs the file by asking twice |
+    | 3+ | **ALLOW** | Nudge: "This file has been read N times this session. Consider using offset/limit for targeted reads." |
+
+    ### What Claude sees on first read (deny)
+
+    ```
+    -- youwhatknow: src/server.rs --
+    src/server.rs (245 lines) -- Axum server with activity tracking and idle shutdown
+    Public: create_router, start_server, AppState
+
+      1-45    imports and types
+      46-120  router setup and middleware
+      121-200 hook endpoint handlers
+      201-245 health and status endpoints
+
+    Read specific sections with offset/limit, or read again for the full file.
+    If this summary is sufficient, do not read the file. If you need the full file contents, read it again.
+    ```
+
+    ### What Claude sees on third+ read (allow with nudge)
+
+    ```
+    This file has been read 3 times this session. Consider using offset/limit for targeted reads.
+    ```
+
+    ### SessionStart
+
+    Fires when a new Claude Code session starts. The daemon injects:
+
+    1. A full project map (folder/file hierarchy with descriptions)
+    2. Session instructions: the line threshold, how to use `youwhatknow summary`, and offset/limit tips
+    3. A note if indexing is still in progress
+
+    ```
+    -- youwhatknow: project map --
+    src/ -- Core hook server implementation with CLI, daemon, server, and indexing
+      cli.rs -- CLI command handlers for daemon and summary management
+      config.rs -- System and per-project configuration loading via Figment
+      ...
+
+    -- youwhatknow: instructions --
+    Files over 30 lines show a summary on first read. Read again for the full file, or use offset/limit.
+    To preview any file without triggering a read: run `youwhatknow summary <path>` in the terminal.
+    Run `youwhatknow prime` for full workflow context, troubleshooting, and all available commands.
+    ```
+
+    > The deny is soft -- Claude can always read the file by trying again. youwhatknow just makes it consider the summary first.
+
+- title: Working Set Eviction
+  slug: eviction
+  content: |
+    ## Working Set Eviction
+
+    youwhatknow tracks reads using a per-session monotonic sequence counter. Each file read increments the counter. When the distance between the current sequence and a file's last read exceeds the eviction threshold, that file's read count resets to zero.
+
+    ### How it works
+
+    ```
+    current_seq - file_last_seq > eviction_threshold
+    ```
+
+    With the default `eviction_threshold` of 40, after more than 40 intervening file reads, a file fades back to "unread" -- the next access shows the summary again.
+
+    This keeps Claude's working set current: files it hasn't touched recently get a fresh summary on next access. No manual cleanup needed.
+
+    ### Configuration
+
+    ```toml
+    # .claude/youwhatknow.toml
+    eviction_threshold = 40    # default
+    eviction_threshold = 0     # disable eviction entirely
+    ```
+
+    ### Manual reset
+
+    Use `youwhatknow reset <path>` to manually reset a specific file's read count to zero regardless of eviction state.
+
+    ```bash
+    youwhatknow reset src/main.rs
+    ```
+
+- title: Session Management
+  slug: session-management
+  content: |
+    ## Session Management
+
+    youwhatknow tracks file reads per session. Each Claude Code session gets its own isolated tracking state.
+
+    ### Session ID
+
+    The session ID comes from the `SessionStart` hook payload. During `youwhatknow init`, the session ID is extracted and written to `$CLAUDE_ENV_FILE` as:
+
+    ```
+    YOUWHATKNOW_SESSION=<session_id>
+    ```
+
+    This makes the session ID available to subsequent CLI commands like `summary` and `reset`.
+
+    ### Per-session state
+
+    Each session tracks:
+
+    - **Read entries** -- a map of `(session_id, file_path)` to read count and last sequence number
+    - **Sequence counter** -- monotonically increasing per session, incremented on each tracked read
+    - **Last activity time** -- used for timeout-based cleanup
+
+    ### Timeout cleanup
+
+    A background task runs every 10 minutes and removes sessions that haven't been active for `session_timeout_minutes` (default: 60). When a session is cleaned up, all its read entries and sequence state are removed.
+
+    This is configured at the daemon level:
+
+    ```toml
+    # ~/.config/youwhatknow/config.toml
+    session_timeout_minutes = 60    # default
+    ```
+
+- title: Daemon Configuration
+  slug: daemon-config
+  content: |
+    ## Daemon Configuration
+
+    System-wide settings that apply to the daemon itself. These live in your user config directory and affect all projects.
+
+    ```toml
+    # ~/.config/youwhatknow/config.toml
+    # All fields are optional. These are the defaults.
+    port = 7849
+    session_timeout_minutes = 60
+    idle_shutdown_minutes = 30
+    ```
+
+    | Key | Default | Description |
+    |-----|---------|-------------|
+    | `port` | `7849` | TCP port the daemon listens on. Must match the URL in your Claude Code hooks config. |
+    | `session_timeout_minutes` | `60` | Minutes of inactivity before a Claude session's read tracking data is cleaned up. |
+    | `idle_shutdown_minutes` | `30` | Minutes with zero incoming requests before the daemon shuts itself down. Set to `0` to disable. |
+
+    > You probably don't need this file. The defaults are sensible. Only create it if you need to change the port or tweak the shutdown timing.
+
+- title: Project Configuration
+  slug: project-config
+  content: |
+    ## Project Configuration
+
+    Per-project settings that control how youwhatknow indexes a specific codebase. These live inside each project and are picked up automatically.
+
+    ```toml
+    # your-project/.claude/youwhatknow.toml
+    # All fields are optional. These are the defaults.
+    summary_path = ".claude/summaries"
+    max_file_size_kb = 100
+    line_threshold = 30
+    ignored_patterns = []
+    max_concurrent_batches = 4
+    eviction_threshold = 40
+    ```
+
+    | Key | Default | Description |
+    |-----|---------|-------------|
+    | `summary_path` | `".claude/summaries"` | Directory (relative to project root) where TOML summary files are stored. |
+    | `max_file_size_kb` | `100` | Files larger than this (in KB) are skipped during indexing. |
+    | `line_threshold` | `30` | Files at or under this many lines pass through without a summary. Set to `0` to always inject summaries. |
+    | `ignored_patterns` | `[]` | Additional glob patterns for files to skip during indexing. |
+    | `max_concurrent_batches` | `4` | Number of parallel batches for description generation. |
+    | `eviction_threshold` | `40` | Sequence distance before a file's read count resets. Set to `0` to disable eviction. |
+
+    ### Built-in ignore patterns
+
+    These are always applied, in addition to any `ignored_patterns` you configure:
+
+    ```
+    # Lock files
+    package-lock.json, yarn.lock, pnpm-lock.yaml
+    Cargo.lock, composer.lock, Gemfile.lock, poetry.lock
+
+    # Generated / minified
+    *.min.js, *.min.css, *.generated.*, *.bundle.*, *.map
+    ```
+
+    Binary files (detected by null bytes in the first 512 bytes) and files exceeding `max_file_size_kb` are also always skipped.
+
+- title: API Endpoints
+  slug: api-endpoints
+  content: |
+    ## API Endpoints
+
+    All endpoints listen on localhost only. No authentication required (and none supported -- it's a local daemon).
+
+    ### POST /hook/pre-read
+
+    Called by Claude Code's `PreToolUse` hook. Receives the hook payload as JSON, returns a hook response with the file summary (on deny) or context (on nudge). The project is identified from the `cwd` field.
+
+    **Request body:** `HookRequest` with `session_id`, `cwd`, `hook_event_name`, `tool_name`, `tool_input` (containing `file_path`, optional `offset`, `limit`).
+
+    ### POST /hook/session-start
+
+    Called by Claude Code's `SessionStart` hook. Returns the project structure map and session instructions as context. Triggers lazy project loading if this is the first request for the project.
+
+    **Request body:** `HookRequest` with `session_id`, `cwd`, `hook_event_name`.
+
+    ### POST /hook/summary
+
+    CLI summary endpoint. Returns the rendered file summary as plain text.
+
+    **Request body:** JSON with `cwd` (required), `file_path` (required), `session_id` (optional). If `session_id` is provided, primes the read count so the next Read hook allows through.
+
+    ### POST /hook/reset-read
+
+    CLI reset endpoint. Resets the read count for a file.
+
+    **Request body:** JSON with `session_id` (required), `cwd` (required), `file_path` (required). Returns 400 without `session_id`.
+
+    ### POST /reindex
+
+    Triggers a re-index of a project. Returns 202 Accepted immediately; indexing runs in the background.
+
+    **Request body:** JSON with `cwd` (required), `full` (optional boolean, default `false`).
+
+    ### GET /health
+
+    Health check. Returns JSON with `status` and `projects` count. Useful for checking if the daemon is running. Touches the activity timer.
+
+    ```json
+    {"status": "ok", "projects": 2}
+    ```
+
+    ### GET /status
+
+    Detailed daemon status. Returns JSON with `pid`, `port`, `uptime_secs`, `idle_secs`, `active_sessions`, `loaded_projects`, and `idle_shutdown_minutes`. Used by `youwhatknow status`.
+
+    Intentionally does **not** touch the activity timer -- polling status won't prevent idle shutdown.
+
+    ```json
+    {
+      "pid": 12345,
+      "port": 7849,
+      "uptime_secs": 8040,
+      "idle_secs": 202,
+      "active_sessions": 3,
+      "loaded_projects": 2,
+      "idle_shutdown_minutes": 30
+    }
+    ```
+
+- title: "Indexing & Symbols"
+  slug: indexing
+  content: |
+    ## Indexing & Symbols
+
+    ### How files are discovered
+
+    youwhatknow uses `git ls-files --cached --others --exclude-standard` to discover files, which means it automatically respects your `.gitignore`. Files are then filtered by size, binary detection, and ignore patterns.
+
+    ### Symbol extraction
+
+    Public symbols are extracted using tree-sitter grammars. This is what populates the "Public:" line in summaries.
+
+    | Language | Extensions | What's extracted |
+    |----------|-----------|-----------------|
+    | Rust | `.rs` | `pub fn`, `pub struct`, `pub enum`, `pub trait`, `pub type` |
+    | TypeScript | `.ts`, `.tsx` | `export function`, `class`, `interface`, `type`, `const` |
+    | JavaScript | `.js`, `.jsx` | `export function`, `class`, `const` (ES6 module syntax) |
+    | Python | `.py` | Top-level `def`, `class` definitions |
+    | Go | `.go` | Exported (capitalized) `func`, `type`, method |
+
+    Files with unrecognized extensions still get indexed -- they just won't have symbol information.
+
+    Rust files also get line-range analysis: the summary includes a map of line ranges to semantic labels (e.g., "imports and types", "router setup", "tests").
+
+    ### Description generation
+
+    **Primary:** Batched calls to `claude --dangerously-skip-permissions --model haiku --print`. The first 100 lines of each file plus extracted symbols are sent in batches of 15. Concurrency is controlled by `max_concurrent_batches` (default: 4).
+
+    **Fallback:** If the `claude` CLI isn't available, descriptions are derived from the filename and symbols (e.g., "Main -- main()" or "Config" for a file with no symbols).
+
+    ### Incremental re-indexing
+
+    On subsequent runs, youwhatknow uses `git diff` against the last-known commit hash to find changed files and only re-indexes those. It also picks up unstaged changes and untracked files. The commit hash is stored in `.claude/summaries/.last-run`.
+
+    Trigger a full reindex to ignore change detection:
+
+    ```bash
+    youwhatknow reindex --full
+    ```
+
+- title: Storage Format
+  slug: storage
+  content: |
+    ## Storage Format
+
+    Summaries are stored as human-readable TOML files in each project's `.claude/summaries/` directory.
+
+    ### Per-folder summary
+
+    ```toml
+    # .claude/summaries/src.toml
+    generated = "2026-03-21T10:00:00Z"
+    description = "Core application logic"
+
+    [files."main.rs"]
+    path = "src/main.rs"
+    description = "Entry point, daemon startup"
+    symbols = ["main()"]
+    line_count = 120
+    summarized = "2026-03-21T10:00:00Z"
+    ```
+
+    ### Project summary
+
+    ```toml
+    # .claude/summaries/project-summary.toml
+    generated = "2026-03-21T10:00:00Z"
+    last_commit = "abc123"
+
+    [folders.src]
+    path = "src/"
+    description = "Core application logic"
+    ```
+
+    ### Folder key conversion
+
+    Nested folders use `--` as a separator in filenames:
+
+    | Folder path | TOML file |
+    |------------|-----------|
+    | `src/` | `src.toml` |
+    | `src/indexer/` | `src--indexer.toml` |
+    | root files | `root.toml` |
+
+    The functions `folder_to_key` and `key_to_folder` handle this conversion.
+
+    ### Atomic writes
+
+    All writes go to a temp file in the same directory first, then rename to the target path. This prevents partial writes from corrupting summary files.
+
+- title: Environment Variables
+  slug: env-vars
+  content: |
+    ## Environment Variables
+
+    All daemon config options can be overridden via environment variables with the `YOUWHATKNOW_` prefix:
+
+    | Variable | Config key |
+    |----------|-----------|
+    | `YOUWHATKNOW_PORT` | `port` |
+    | `YOUWHATKNOW_SESSION_TIMEOUT_MINUTES` | `session_timeout_minutes` |
+    | `YOUWHATKNOW_IDLE_SHUTDOWN_MINUTES` | `idle_shutdown_minutes` |
+
+    Environment variables take precedence over the config file (Figment merge order: defaults, then TOML file, then env vars).
+
+    ```bash
+    # Run on a different port, never auto-shutdown
+    YOUWHATKNOW_PORT=9000 YOUWHATKNOW_IDLE_SHUTDOWN_MINUTES=0 youwhatknow
+    ```
+
+    There is also `YOUWHATKNOW_SESSION`, which is set automatically by `youwhatknow init` via `$CLAUDE_ENV_FILE`. It's used by `youwhatknow summary` and `youwhatknow reset` to identify the current session.
+
+- title: Daemon Lifecycle
+  slug: lifecycle
+  content: |
+    ## Daemon Lifecycle
+
+    ### PID file
+
+    PID is written to `~/.local/share/youwhatknow/youwhatknow.pid` on startup and removed on shutdown via a drop guard.
+
+    ### Starting
+
+    ```bash
+    youwhatknow          # foreground
+    youwhatknow serve    # same thing
+    ```
+
+    If the port is already in use, the daemon exits with an error. The `setup` and `init` commands will auto-start the daemon as a background process (stdout/stderr redirected to `~/.local/share/youwhatknow/daemon.log`).
+
+    ### Stopping
+
+    Three ways to stop the daemon:
+
+    1. **Ctrl+C / SIGTERM** -- graceful shutdown via tokio signal handler
+    2. **Idle timeout** -- after `idle_shutdown_minutes` (default: 30) with no requests, the daemon shuts itself down
+    3. **Manual kill** -- `youwhatknow restart` sends a kill signal, or kill the PID directly
+
+    ### Multi-project
+
+    One daemon handles all projects. Projects are loaded lazily on first request -- identified by the `cwd` field in hook payloads. No per-project daemon instances needed.
+
+    ### Worktree sharing
+
+    Different git worktrees of the same repo share the same project index. youwhatknow resolves the `cwd` to the main worktree root using `git rev-parse --git-common-dir`, so a linked worktree uses the same summaries as the main checkout.
+
+- title: Nix Integration
+  slug: nix
+  content: |
+    ## Nix Integration
+
+    The project's `flake.nix` provides a package output.
+
+    ### As a flake input
+
+    ```nix
+    # your-project/flake.nix
+
+    # Add youwhatknow as an input
+    inputs.youwhatknow.url = "github:wavefunk/youwhatknow";
+
+    # In your devShell packages:
+    packages = [ youwhatknow.packages.${system}.default ];
+    ```
+
+    The built package wraps the binary with `claude-code` on `PATH`, so `claude` CLI is available for description generation without extra configuration.
+
+    ### Shell hook for auto-start
+
+    Add a shell hook to your devShell to start the daemon automatically when entering the environment:
+
+    ```nix
+    shellHook = ''
+      if command -v claude &>/dev/null && command -v youwhatknow &>/dev/null; then
+        pid_file="$HOME/.local/share/youwhatknow/youwhatknow.pid"
+        if [ ! -f "$pid_file" ] || ! kill -0 "$(cat "$pid_file")" 2>/dev/null; then
+          youwhatknow serve &
+        fi
+      fi
+    '';
+    ```
+
+    This checks for both `claude` and `youwhatknow` on PATH, checks the PID file, and starts the daemon in the background if not already running.
+
+    ### Build caching
+
+    Source filtering ensures only files that affect the Rust build are included in the derivation hash:
+
+    - `src/` directory and all `.rs` files
+    - `Cargo.toml` and `Cargo.lock`
+    - `build.rs` if present
+
+    Changes to docs, configs, or other non-Rust files won't trigger a rebuild.
+
+- title: Troubleshooting
+  slug: troubleshooting
+  content: |
+    ## Troubleshooting
+
+    ### Summaries not showing?
+
+    Check that the daemon is running:
+
+    ```bash
+    youwhatknow status
+    ```
+
+    If it's not running, start it:
+
+    ```bash
+    youwhatknow restart
+    ```
+
+    Verify hooks are configured in your project:
+
+    ```bash
+    cat .claude/settings.local.json
+    # or
+    cat .claude/settings.json
+    ```
+
+    You should see `SessionStart` and `PreToolUse` hook entries pointing to youwhatknow.
+
+    ### Stale or missing summaries?
+
+    Force a full reindex:
+
+    ```bash
+    youwhatknow reindex --full
+    ```
+
+    This ignores change detection and re-indexes every file.
+
+    ### Need the full file?
+
+    Just read the file again. The first read shows the summary (deny), the second read allows through with no injection. You can also use `offset`/`limit` for targeted reads that bypass the summary entirely.
+
+    ### Check the logs
+
+    ```bash
+    youwhatknow logs -n 20      # last 20 lines
+    youwhatknow logs -f         # follow output
+    ```
+
+    Logs are written to `~/.local/share/youwhatknow/daemon.log`.
+
+    ### Port conflict
+
+    If the daemon can't start because port 7849 is in use:
+
+    ```bash
+    # Check what's using the port
+    lsof -i :7849
+
+    # Use a different port
+    YOUWHATKNOW_PORT=9000 youwhatknow
+    ```
+
+    Remember to re-run `youwhatknow setup` after changing the port so hooks point to the right URL.
+
+    ### Daemon won't stop
+
+    ```bash
+    # Check the PID file
+    cat ~/.local/share/youwhatknow/youwhatknow.pid
+
+    # Kill directly if restart hangs
+    kill $(cat ~/.local/share/youwhatknow/youwhatknow.pid)
+    ```
+
+    ### Description generation failing
+
+    If you see "using fallback descriptions" in the logs, the `claude` CLI isn't available or isn't working. Fallback descriptions are derived from filenames and symbols -- functional but less descriptive.
+
+    Make sure `claude` is on your PATH and authenticated:
+
+    ```bash
+    claude --version
+    ```
+
+    ### Common diagnostic commands
+
+    ```bash
+    youwhatknow status --json    # machine-readable status
+    youwhatknow reindex --json   # JSON confirmation of reindex
+    youwhatknow prime            # full agent workflow context
+    youwhatknow summary <path>   # preview what Claude would see
+    ```
