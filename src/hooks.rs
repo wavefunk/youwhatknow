@@ -35,7 +35,13 @@ pub async fn handle_pre_read(
         Err(_) => return HookResponse::allow_no_context("PreToolUse"),
     };
 
-    // 2. No summary available
+    // 2. Never gate reads of our own summary files (avoid recursion and let
+    //    Claude freely inspect cached summaries).
+    if rel_path.starts_with(&config.summary_path) {
+        return HookResponse::allow_no_context("PreToolUse");
+    }
+
+    // 3. No summary available
     let Some(file_summary) = index.lookup_file(rel_path).await else {
         return HookResponse::allow_no_context("PreToolUse");
     };

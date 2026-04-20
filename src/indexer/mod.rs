@@ -235,8 +235,10 @@ impl Index {
         // Filter changed files through the same rules
         let max_size = config.max_file_size_kb * 1024;
         let ignore_patterns = config.all_ignore_patterns();
+        let summary_path = Path::new(&config.summary_path);
         let indexable: Vec<PathBuf> = changed
             .into_iter()
+            .filter(|rel_path| !rel_path.starts_with(summary_path))
             .filter(|rel_path| {
                 let abs_path = project_root.join(rel_path);
                 if !abs_path.is_file() {

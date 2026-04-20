@@ -21,11 +21,13 @@ pub fn discover_files(project_root: &Path, config: &ProjectConfig) -> eyre::Resu
     let stdout = String::from_utf8_lossy(&output.stdout);
     let max_size = config.max_file_size_kb * 1024;
     let ignore_patterns = config.all_ignore_patterns();
+    let summary_path = Path::new(&config.summary_path);
 
     let files: Vec<PathBuf> = stdout
         .lines()
         .filter(|line| !line.is_empty())
         .map(PathBuf::from)
+        .filter(|rel_path| !rel_path.starts_with(summary_path))
         .filter(|rel_path| {
             let abs_path = project_root.join(rel_path);
             should_index(&abs_path, rel_path, max_size, &ignore_patterns)
